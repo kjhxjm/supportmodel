@@ -109,10 +109,10 @@ function updateStatus(isRunning) {
 
     if (isRunning) {
         indicator.classList.add('active');
-        statusText.textContent = '模型在线 | 推理中...';
+        statusText.textContent = '';
     } else {
         indicator.classList.remove('active');
-        statusText.textContent = '待机中 | 常规逻辑';
+        statusText.textContent = '';
     }
 }
 
