@@ -1,7 +1,7 @@
 // 全局状态
 let currentState = {
-    model_name: '越野物流',
-    task_description: ''
+    task_description: '',
+    node_insights: {}  // 缓存后端一次性返回的所有节点洞察
 };
 
 let selectedNodeId = null;
@@ -15,22 +15,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initializeControls() {
-    const modelSelect = document.getElementById('modelSelect');
     const taskInput = document.getElementById('taskInput');
     const startReasoning = document.getElementById('startReasoning');
     const zoomInBtn = document.getElementById('treeZoomIn');
     const zoomOutBtn = document.getElementById('treeZoomOut');
     const behaviorTree = document.getElementById('behaviorTree');
-
-    if (modelSelect) {
-        currentState.model_name = modelSelect.value;
-        modelSelect.addEventListener('change', () => {
-            currentState.model_name = modelSelect.value;
-            currentState.task_description = taskInput ? taskInput.value.trim() : currentState.task_description;
-            updateStatus(true);
-            updateDisplay();
-        });
-    }
 
     if (startReasoning) {
         startReasoning.addEventListener('click', () => {
@@ -104,15 +93,27 @@ function initializeControls() {
 function updateStatus(isRunning) {
     const indicator = document.getElementById('statusIndicator');
     const statusText = document.getElementById('statusText');
+    const loadingMask = document.getElementById('loadingMask');
+    const startReasoningBtn = document.getElementById('startReasoning');
 
     if (!indicator || !statusText) return;
 
     if (isRunning) {
         indicator.classList.add('active');
-        statusText.textContent = '';
+        statusText.textContent = '推理中...';
+        if (loadingMask) loadingMask.style.display = 'flex';
+        if (startReasoningBtn) {
+            startReasoningBtn.disabled = true;
+            startReasoningBtn.textContent = '推理中...';
+        }
     } else {
         indicator.classList.remove('active');
         statusText.textContent = '';
+        if (loadingMask) loadingMask.style.display = 'none';
+        if (startReasoningBtn) {
+            startReasoningBtn.disabled = false;
+            startReasoningBtn.textContent = '开始推理';
+        }
     }
 }
 
@@ -124,6 +125,9 @@ function updateDisplay() {
     })
         .then(res => res.json())
         .then(data => {
+            // 缓存节点洞察，后续点击节点时不再请求后端
+            currentState.node_insights = data.node_insights || {};
+
             renderBehaviorTree(data.behavior_tree);
             selectedNodeId = data.default_node_id;
             updateInsightPanel(data.insight);
@@ -150,7 +154,7 @@ function renderBehaviorTree(treeData) {
         return;
     }
 
-    // 转换数据格式为G6所需的格式
+    // 转换数据格式为G6所需的格式（带是否有知识图谱的标记）
     const graphData = convertToG6Format(treeData);
 
     if (!graphObj) {
@@ -210,17 +214,16 @@ function renderBehaviorTree(treeData) {
             const nodeType = getNodeType(node);
             const nodeColor = getNodeColor(node.status);
 
-            // 检查是否有子节点
-            const nodeData = node.data || {};
-            const hasChildren = nodeData.children && nodeData.children.length > 0;
+            const hasKnowledgeGraph = !!node.hasKnowledgeGraph;
 
             return {
                 label: node.label || node.id,
+                size: hasKnowledgeGraph ? 80 : 60, // 带知识图谱的节点放大显示
                 style: {
                     fill: nodeColor.background,
-                    stroke: nodeColor.border,
-                    lineWidth: 3,
-                    cursor: hasChildren ? 'pointer' : 'default', // 有子节点时显示pointer光标
+                    stroke: hasKnowledgeGraph ? '#FF5722' : nodeColor.border,
+                    lineWidth: hasKnowledgeGraph ? 4 : 3,
+                    cursor: hasKnowledgeGraph ? 'pointer' : 'default',
                 },
                 labelCfg: {
                     position: 'center',
@@ -231,69 +234,56 @@ function renderBehaviorTree(treeData) {
                         textAlign: 'center',
                     },
                 },
-                // 添加节点类型徽章 - 暂时禁用图标以避免404错误
-                // icon: {
-                //     show: true,
-                //     img: getNodeTypeIcon(nodeType),
-                //     width: 20,
-                //     height: 20,
-                //     offset: [0, -25]
-                // },
             };
-        });
-
-        // 绑定节点点击事件 - 单次点击查看详情
-        graphObj.on('node:click', (evt) => {
-            const node = evt.item;
-            const model = node.getModel();
-            fetchNodeInsight(model.id);
         });
 
         // 绑定节点鼠标事件
         let clickTimer = null;
 
-        // 鼠标悬停显示提示
+        // 鼠标悬停高亮（仅对有知识图谱的节点）
         graphObj.on('node:mouseenter', (evt) => {
             const node = evt.item;
             const model = node.getModel();
-            const nodeData = model.data || {};
-            const hasChildren = nodeData.children && nodeData.children.length > 0;
+            const hasKnowledgeGraph = !!model.hasKnowledgeGraph;
 
-            // 改变边框颜色表示可交互
+            if (!hasKnowledgeGraph) {
+                return;
+            }
+
             model.style = model.style || {};
-            model.style.stroke = '#2196F3'; // 蓝色边框
-            model.style.lineWidth = 4;
+            model.style.stroke = '#FF7043'; // 橙色高亮
+            model.style.lineWidth = 5;
             graphObj.updateItem(node, model);
-
-            // 更新鼠标样式
-            evt.target.style.cursor = hasChildren ? 'pointer' : 'default';
         });
 
         graphObj.on('node:mouseleave', (evt) => {
             const node = evt.item;
             const model = node.getModel();
             const nodeColor = getNodeColor(model.status);
+            const hasKnowledgeGraph = !!model.hasKnowledgeGraph;
 
-            // 恢复原始边框
             model.style = model.style || {};
-            model.style.stroke = nodeColor.border;
-            model.style.lineWidth = 3;
+            model.style.stroke = hasKnowledgeGraph ? '#FF5722' : nodeColor.border;
+            model.style.lineWidth = hasKnowledgeGraph ? 4 : 3;
             graphObj.updateItem(node, model);
         });
 
-        // 单次点击查看详情
+        // 单次点击查看详情（仅对带知识图谱的节点生效）
         graphObj.on('node:click', (evt) => {
             // 清除之前的定时器
             if (clickTimer) {
                 clearTimeout(clickTimer);
             }
 
-            // 设置延迟，区分单双击
             clickTimer = setTimeout(() => {
                 const node = evt.item;
                 const model = node.getModel();
-                fetchNodeInsight(model.id);
-            }, 200); // 200ms延迟
+                const hasKnowledgeGraph = !!model.hasKnowledgeGraph;
+                if (!hasKnowledgeGraph) {
+                    return; // 无知识图谱时不支持点击
+                }
+                showNodeInsightFromCache(model.id);
+            }, 200);
         });
 
         // 双击展开/折叠
@@ -337,11 +327,16 @@ function renderBehaviorTree(treeData) {
 
 // 数据转换：将现有格式转换为G6格式
 function convertToG6Format(node) {
+    const nodeId = node.id;
+    const insight = (currentState.node_insights || {})[nodeId];
+    const hasKnowledgeGraph = !!(insight && insight.knowledge_graph);
+
     return {
-        id: node.id,
-        label: node.label || node.id,
+        id: nodeId,
+        label: node.label || nodeId,
         status: node.status || 'pending',
         summary: node.summary || '',
+        hasKnowledgeGraph: hasKnowledgeGraph,
         collapsed: false,  // 默认展开
         children: node.children ? node.children.map(convertToG6Format) : []
     };
@@ -379,24 +374,16 @@ function getNodeColor(status) {
     return colors[status] || { background: '#FAFAFA', border: '#E0E0E0' };
 }
 
-function fetchNodeInsight(nodeId) {
+// 使用本地缓存的节点洞察展示策略依据与知识图谱
+function showNodeInsightFromCache(nodeId) {
     if (!nodeId) return;
+    const insight = (currentState.node_insights || {})[nodeId];
+    if (!insight || !insight.knowledge_graph) {
+        return; // 没有知识图谱则不响应点击
+    }
+    selectedNodeId = nodeId;
     highlightSelectedNode(nodeId);
-    fetch('/api/node_insight', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model_name: currentState.model_name,
-            node_id: nodeId,
-            task_description: currentState.task_description
-        })
-    })
-        .then(res => res.json())
-        .then(data => {
-            selectedNodeId = nodeId;
-            updateInsightPanel(data);
-        })
-        .catch(err => console.error('node insight error:', err));
+    updateInsightPanel(insight);
 }
 
 function highlightSelectedNode(nodeId) {
@@ -598,13 +585,16 @@ function renderInsightGraph(graphData) {
 }
 
 function convertInsightToG6Format(graphData) {
+    const nodes = Array.isArray(graphData.nodes) ? graphData.nodes : [];
+    const edges = Array.isArray(graphData.edges) ? graphData.edges : [];
+
     return {
-        nodes: graphData.nodes.map(node => ({
+        nodes: nodes.map(node => ({
             id: node.id,
             label: node.label,
             type: node.type || 'process',
         })),
-        edges: graphData.edges.map(edge => ({
+        edges: edges.map(edge => ({
             source: edge.source,
             target: edge.target,
         }))

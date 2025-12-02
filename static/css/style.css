@@ -322,6 +322,49 @@ body {
     margin-top: auto;
 }
 
+/* 全局加载遮罩 */
+.loading-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+}
+
+.loading-mask-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 32px;
+    border-radius: 12px;
+    background: #FFFFFF;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.loading-spinner {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 3px solid #BBDEFB;
+    border-top-color: #1976D2;
+    animation: loading-rotate 0.8s linear infinite;
+}
+
+.loading-text {
+    font-size: 14px;
+    color: #455A64;
+}
+
+@keyframes loading-rotate {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 /* 响应式设计 */
 @media (max-width: 1400px) {
     .main-layout {

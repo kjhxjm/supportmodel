@@ -5,7 +5,12 @@ import os
 
 from support_models import SUPPORT_MODELS, get_model_blueprint, DEFAULT_NODE_INSIGHT
 from support_models.offroad_logistics import generate_dynamic_blueprint
-from support_models.llm_client import BlueprintResult, generate_blueprint_with_llm
+from support_models.llm_client import (
+    BlueprintResult,
+    ClassificationResult,
+    classify_model_with_llm,
+    generate_blueprint_with_llm,
+)
 
 app = Flask(__name__)
 
@@ -14,6 +19,42 @@ def _normalize_model_name(model_name):
     if model_name in SUPPORT_MODELS:
         return model_name
     return SUPPORT_MODELS[0]
+
+
+def _auto_detect_model(task_description: str) -> str:
+    """
+    通过大模型根据任务描述自动判断所属支援模型。
+
+    - 若未正确配置 GLM 环境变量，则回退到默认模型（SUPPORT_MODELS[0]）
+    - 仅在 USE_LLM_BLUEPRINT 为真时启用自动分类，避免在纯离线模式下误调用
+    """
+    use_llm = os.environ.get("USE_LLM_BLUEPRINT", "").lower() in {"1", "true", "yes"}
+    if not task_description.strip():
+        # 无任务描述时，保持默认模型且不调 LLM
+        return SUPPORT_MODELS[0]
+
+    if not use_llm:
+        # 未开启 LLM 时，仅使用默认模型
+        return SUPPORT_MODELS[0]
+
+    try:
+        result: ClassificationResult = classify_model_with_llm(task_description)
+        model_name = result.model_name
+        if model_name in SUPPORT_MODELS:
+            print(
+                f"[LLM] 自动分类结果: model_name={model_name}, reason={result.reason}",
+                flush=True,
+            )
+            return model_name
+        print(
+            f"[LLM] 分类结果不在候选集合中，回退默认模型: raw={result.raw_content!r}",
+            flush=True,
+        )
+        return SUPPORT_MODELS[0]
+    except Exception as e:
+        # 任意异常都不影响原有逻辑
+        print(f"[LLM] 自动分类异常: {e}", flush=True)
+        return SUPPORT_MODELS[0]
 
 
 def _maybe_use_llm_blueprint(
@@ -48,7 +89,12 @@ def _maybe_use_llm_blueprint(
 def build_behavior_tree(
     blueprint: dict, task_description: str, model_name: Optional[str] = None
 ):
-    """根据蓝图和任务描述构建行为树"""
+    """
+    根据蓝图和任务描述构建行为树，并返回最终使用的蓝图。
+
+    返回值:
+        (behavior_tree: dict, final_blueprint: dict)
+    """
     # 对于越野物流模型，优先使用现有的规则动态生成
     if model_name == "越野物流" and task_description.strip():
         blueprint = generate_dynamic_blueprint(task_description)
@@ -72,7 +118,7 @@ def build_behavior_tree(
             _inject_summary(child)
 
     _inject_summary(tree)
-    return tree
+    return tree, blueprint
 
 
 def extract_node_insight(
@@ -130,18 +176,38 @@ def get_models():
 def update():
     """根据任务描述生成行为树与策略依据"""
     data = request.json or {}
-    model_name = _normalize_model_name(data.get('model_name', SUPPORT_MODELS[0]))
     task_description = data.get('task_description', '').strip()
 
-    blueprint = get_model_blueprint(model_name)
-    behavior_tree = build_behavior_tree(blueprint, task_description, model_name)
-    default_node_id = blueprint.get('default_focus', behavior_tree.get('id'))
-    node_insight = extract_node_insight(model_name, default_node_id, blueprint, task_description)
+    # 优先使用自动分类结果；如前端仍显式传入 model_name，则以显式参数为准
+    auto_model_name = _auto_detect_model(task_description)
+    explicit_model_name = data.get('model_name')
+    model_name = _normalize_model_name(explicit_model_name) if explicit_model_name else auto_model_name
+
+    if explicit_model_name:
+        print(
+            f"[API] /api/update 使用显式模型: explicit={explicit_model_name} -> normalized={model_name}",
+            flush=True,
+        )
+    else:
+        print(
+            f"[API] /api/update 使用自动分类模型: auto={auto_model_name}",
+            flush=True,
+        )
+
+    base_blueprint = get_model_blueprint(model_name)
+    behavior_tree, final_blueprint = build_behavior_tree(
+        base_blueprint, task_description, model_name
+    )
+    default_node_id = final_blueprint.get('default_focus', behavior_tree.get('id'))
+    node_insight = extract_node_insight(
+        model_name, default_node_id, final_blueprint, task_description
+    )
 
     return jsonify({
         'model_name': model_name,
         'task_description': task_description,
         'behavior_tree': behavior_tree,
+        'node_insights': final_blueprint.get('node_insights', {}),
         'insight': node_insight,
         'default_node_id': default_node_id
     })

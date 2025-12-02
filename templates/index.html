@@ -20,17 +20,17 @@
         </div>
     </header>
 
+    <!-- 全局加载遮罩 -->
+    <div id="loadingMask" class="loading-mask" style="display: none;">
+        <div class="loading-mask-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">正在为本次任务构建支援策略，请稍候...</div>
+        </div>
+    </div>
+
     <!-- 主容器 -->
     <div class="container">
         <section class="control-panel">
-            <div class="form-group inline">
-                <label for="modelSelect">支援模型</label>
-                <select id="modelSelect" class="select-box">
-                    {% for model in models %}
-                    <option value="{{ model }}" {% if loop.first %}selected{% endif %}>{{ model }}</option>
-                    {% endfor %}
-                </select>
-            </div>
             <div class="form-group flex-1">
                 <label for="taskInput">任务输入描述</label>
                 <textarea id="taskInput" rows="2" class="textarea"
