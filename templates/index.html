@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>越野物流支援模型 - 知识图谱演示</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <!-- 顶部导航栏 -->
+    <header class="header">
+        <div class="header-content">
+            <h1 class="header-title">🚀 支援模型可视化演示系统 V1.0</h1>
+            <div class="header-status" id="headerStatus">
+                <span class="status-indicator" id="statusIndicator"></span>
+                <span id="statusText">待机中 | 常规逻辑</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <section class="control-panel">
+            <div class="form-group inline">
+                <label for="modelSelect">支援模型</label>
+                <select id="modelSelect" class="select-box">
+                    {% for model in models %}
+                    <option value="{{ model }}" {% if loop.first %}selected{% endif %}>{{ model }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group flex-1">
+                <label for="taskInput">任务输入描述</label>
+                <textarea id="taskInput" rows="2" class="textarea"
+                    placeholder="例如：向位置X运输资源Y，道路存在不确定损毁风险，要求2小时内送达。"></textarea>
+            </div>
+            <button id="startReasoning" class="primary-btn">开始推理</button>
+        </section>
+
+        <div class="main-layout">
+            <section class="left-panel">
+                <div class="panel panel-tree">
+                    <div class="panel-title">
+                        <div>
+                            <h2>🧭 行为树策略生成</h2>
+                            <p class="subtitle">根据任务描述生成可视化行为树，单击节点查看详情，双击展开/折叠。</p>
+                        </div>
+                        <div class="tree-zoom-controls">
+                            <button id="treeZoomOut" class="zoom-btn">－</button>
+                            <span class="zoom-label" id="treeZoomLabel">100%</span>
+                            <button id="treeZoomIn" class="zoom-btn">＋</button>
+                        </div>
+                    </div>
+                    <div id="behaviorTree" class="behavior-tree">
+                        <div id="treeInner" class="tree-inner">
+                            <!-- 行为树内容将通过JavaScript动态加载 -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="right-panel">
+                <div class="panel panel-insight">
+                    <div class="panel-title">
+                        <div>
+                            <h2>🧠 策略依据面板</h2>
+                            <p class="subtitle">展示当前节点的推理逻辑与支援模型依据。</p>
+                        </div>
+                    </div>
+                    <div id="insightPanel" class="insight-panel">
+                        <div id="insightGraphContainer" class="insight-graph-container">
+                            <!-- 知识图谱容器 -->
+                        </div>
+                        <div id="insightTextContainer" class="insight-text-container">
+                            <p class="placeholder">点击左侧行为树节点即可查看策略依据与推理解释。</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- 底部 -->
+    <footer class="footer">
+        <p>支援模型可视化演示系统 V1.0 | 截图模式开启</p>
+    </footer>
+
+    <script src="https://gw.alipayobjects.com/os/lib/antv/g6/4.8.24/dist/g6.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+
+</html>
