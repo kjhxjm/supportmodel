@@ -1,31 +1,54 @@
-# 支援模型可视化演示系统
+## 支援模型可视化演示系统
 
-一个基于Flask和G6的支援模型推理可视化平台，支持动态任务解析和知识图谱展示。
+一个基于 Flask 和 G6 的支援模型推理可视化平台，支持动态任务解析、知识图谱展示，并可选接入大模型按测试大纲生成行为树蓝图。
 
-## 🚀 快速开始
+### 🚀 快速开始
 
-### 环境要求
-- Python 3.6+
+#### 环境要求
+- Python 3.8+
 - Flask
 - 现代浏览器
 
-### 安装运行
-```bash
-# 安装依赖
-pip3 install flask
+#### 安装依赖
 
-# 启动服务
-python3 app.py
+推荐使用虚拟环境：
+
+```bash
+pip install -r requirements.txt
+```
+
+#### 运行后端
+
+```bash
+python app.py
 
 # 访问应用
 # http://localhost:5000
 ```
 
-## 📋 接口设计
+#### （可选）启用大模型生成蓝图
 
-### 核心架构
+如果希望让系统根据《测试任务说明书》（`instruction/outline.md` + `instruction/task.md`）中 20 条测试项目自动生成行为树，并结合真实任务描述自动补全推理链条，可以配置以下环境变量：
 
+```bash
+# 必选：大模型服务地址和 API Key（示例为 GLM）
+export GLM_BASE_URL="https://xxx"      # 你的 GLM / OpenAI 兼容接口地址
+export GLM_API_KEY="sk-xxx"            # 你的 API Key
+
+# 可选：模型名称，缺省为 glm-4-flash
+export GLM_MODEL_NAME="glm-4-flash"
+
+# 开启 LLM 蓝图生成（不配置则完全沿用现有规则/静态蓝图）
+export USE_LLM_BLUEPRINT=1
 ```
+
+> 未配置上述变量时，系统仍按原有静态/规则蓝图正常工作，接口结构不变。
+
+### 📋 接口设计
+
+#### 核心架构
+
+```text
 📁 support_models/          # 支援模型核心
 ├── __init__.py            # 模型注册中心
 ├── base.py                # 基础框架和接口规范
@@ -38,9 +61,9 @@ python3 app.py
 └── app.py                # Flask应用主入口
 ```
 
-### API接口
+#### API 接口
 
-#### GET /api/models
+##### GET /api/models
 获取所有可用支援模型列表
 ```json
 {
@@ -48,7 +71,7 @@ python3 app.py
 }
 ```
 
-#### POST /api/update
+##### POST /api/update
 根据任务描述生成行为树和策略依据
 ```json
 // 请求
@@ -67,7 +90,7 @@ python3 app.py
 }
 ```
 
-#### POST /api/node_insight
+##### POST /api/node_insight
 获取特定节点的详细洞察信息
 ```json
 // 请求
@@ -89,9 +112,34 @@ python3 app.py
 }
 ```
 
-## 🛠️ 开发新模型
+### 🧠 LLM 集成与测试场景 one-shot
 
-### 1. 创建模型文件
+系统内置了对《测试大纲》中 20 条支援模型测试项目的结构化描述，位于：
+
+- `instruction/outline.md`：给出 5 类支援模型 × 20 个测试项目的结构化表格
+- `instruction/task.md`：对每个测试项目给出 **测试目标 + 示例输入 + 期望推理链条**
+- `support_models/scenarios.py`：将上述内容编码为 `Scenario` 对象（`model_name + example_input + reasoning_chain`）
+
+当环境变量 `USE_LLM_BLUEPRINT=1` 时，后端会在不改变接口入参/出参结构的前提下，按以下流程可选接入大模型：
+
+- 根据前端传入的 `model_name` 与 `task_description`，在 `SCENARIOS` 中找到语义上最相近的测试任务条目（基于 `example_input` 相似度）
+- 将匹配到的条目（示例输入 + 期待的推理链条）作为 **one-shot 提示** 合并进大模型的 system / user 提示词
+- 要求大模型直接输出一个合法的 `BLUEPRINT` JSON（含 `behavior_tree` + `node_insights`），结构与 `base.py` 中定义的完全一致
+- 如果解析失败或结果不完整，则自动回退到原有蓝图逻辑（静态/规则生成），对前端透明
+
+当前已覆盖的 20 条测试项目包括（示例）：
+
+- **越野物流**：任务编组、动态路径规划与重规划、货物状态监控与保全、车队协同与效率调度
+- **设备投放**：任务编组、高精度目标定位、自主装卸控制、投放确认
+- **伤员救助**：任务编组、远程伤情初步评估与分类、近程伤情评估、伤情数据同步
+- **人员输送**：任务编组、舒适连续导航路径规划、人员与环境安全监控、多目的地协同调度
+- **资源保障**：资源追踪、需求分配建议、补给任务生成与调度、资源消耗预测与规划
+
+前端仍然只需调用 `/api/update` 和 `/api/node_insight`，无需感知是否启用了大模型。
+
+### 🛠️ 开发新模型
+
+#### 1. 创建模型文件
 
 在 `support_models/` 目录下创建新文件：
 
@@ -123,7 +171,7 @@ def generate_dynamic_blueprint(task_description):
 __all__ = ["YOUR_BLUEPRINT"]
 ```
 
-### 2. 注册模型
+#### 2. 注册模型
 
 在 `support_models/__init__.py` 中注册：
 
@@ -138,7 +186,7 @@ SUPPORT_MODELS.append("你的模型名称")
 _BLUEPRINTS["你的模型名称"] = YOUR_BLUEPRINT
 ```
 
-### 3. 蓝图数据结构
+#### 3. 蓝图数据结构
 
 ```python
 BLUEPRINT = {
@@ -180,9 +228,9 @@ BLUEPRINT = {
 }
 ```
 
-## 🎨 高级功能
+### 🎨 高级功能
 
-### 动态任务解析
+#### 动态任务解析
 
 ```python
 def parse_task_description(task_description):
@@ -198,7 +246,7 @@ def parse_task_description(task_description):
     return parsed_info
 ```
 
-### 知识图谱可视化
+#### 知识图谱可视化
 
 支持在节点洞察中嵌入交互式知识图谱：
 
@@ -218,14 +266,14 @@ def parse_task_description(task_description):
 }
 ```
 
-## 📚 学习资源
+### 📚 学习资源
 
 1. **基础模型**: 查看 `base.py` 了解核心数据结构
 2. **动态模型**: 参考 `offroad_logistics.py` 学习动态生成
 3. **静态模型**: 参考 `casualty_rescue.py` 学习静态配置
 4. **前端交互**: 查看 `static/js/main.js` 了解UI逻辑
 
-## 🤝 贡献指南
+### 🤝 贡献指南
 
 1. Fork 本项目
 2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
@@ -233,7 +281,7 @@ def parse_task_description(task_description):
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 创建 Pull Request
 
-## 📄 许可证
+### 📄 许可证
 
 本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
