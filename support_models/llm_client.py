@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
@@ -66,20 +67,91 @@ def _build_prompt(
     - behavior_tree: dict
     - node_insights: dict
     """
+    # JSON Schema 格式说明
+    json_schema_example = """{
+  "default_focus": "priority_plan",
+  "behavior_tree": {
+    "id": "task_parse",
+    "label": "任务解析",
+    "status": "completed",
+    "summary": "解析任务描述并对接相关清单。",
+    "children": [
+      {
+        "id": "data_clean",
+        "label": "数据清洗",
+        "status": "completed",
+        "summary": "融合多源数据。",
+        "children": []
+      }
+    ]
+  },
+  "node_insights": {
+    "task_parse": {
+      "title": "任务解析",
+      "summary": "抽取任务地点、数量与通联方式，构建统一任务面板。",
+      "key_points": [
+        "语义解析识别关键结构",
+        "与知识库比对标签",
+        "向下游节点广播标准化任务包"
+      ],
+      "knowledge_trace": "通过"任务文本→标准任务模板"链路定位到支援模型的场景入口。"
+    },
+    "priority_plan": {
+      "title": "优先级排序",
+      "summary": "结合指数与资源约束动态生成排序列表。",
+      "key_points": [
+        "指数计算：多维度指标加权",
+        "资源约束：实时评估",
+        "动态重排：变动即刻刷新序列"
+      ],
+      "knowledge_trace": "综合指数与资源匹配逻辑，输出实时排序。",
+      "knowledge_graph": {
+        "nodes": [
+          {"id": "input_data", "label": "输入数据", "type": "input"},
+          {"id": "calculation", "label": "计算过程", "type": "process"},
+          {"id": "result", "label": "排序结果", "type": "output"}
+        ],
+        "edges": [
+          {"source": "input_data", "target": "calculation"},
+          {"source": "calculation", "target": "result"}
+        ]
+      }
+    }
+  }
+}"""
+
     # 通用说明
     base_system_content = (
-        "你是一个支援模型推理可视化系统的后端推理助手，需要根据任务描述生成行为树蓝图。\n"
-        "请严格输出 JSON，字段必须包含：\n"
-        "  - default_focus: str，默认聚焦的节点 ID\n"
-        "  - behavior_tree: dict，包含 id/label/status/summary/children\n"
-        "  - node_insights: dict，key 为节点 id，value 为 {title, summary, key_points, knowledge_trace, 可选 knowledge_graph}\n"
-        "status 字段只能是：'pending'、'active'、'completed' 三种之一。\n"
-        "所有行为树节点的 label 字段必须使用简体中文描述，不要使用英文或中英混杂标签。\n"
-        "在 node_insights 中，title、summary、key_points、knowledge_trace 也请统一使用简体中文表述。\n"
-        "对于代表“具体方案/决策”的关键节点（例如资源匹配、编队方案、执行方案等），"
-        "请至少为 1-3 个此类节点补充结构化的 knowledge_graph 字段，用于展示该节点的推理知识图谱分析；\n"
-        "这些 knowledge_graph.nodes[*].label 也必须是中文，能够清晰体现从任务解析 → 方案设计 → 结果输出的推理链条。\n"
-        "注意：前端会通过节点 id 单独请求某一节点的洞察信息，因此请将每个知识图谱严格绑定到对应的方案节点 id 上"
+        "你是一个支援模型推理可视化系统的后端推理助手，需要根据任务描述生成行为树蓝图。\n\n"
+        "📋 输出格式要求（严格遵循）：\n"
+        "1. 必须输出有效的 JSON 对象，不要包含任何 Markdown 代码块标记（如 ```json 或 ```）。\n"
+        "2. JSON 结构必须包含以下三个顶级字段：\n"
+        "   - default_focus: string，默认聚焦的节点 ID（必须是 behavior_tree 中存在的节点 id）\n"
+        "   - behavior_tree: object，行为树根节点，包含以下字段：\n"
+        "     * id: string（唯一标识符）\n"
+        "     * label: string（简体中文显示名称）\n"
+        "     * status: string（只能是 'pending'、'active'、'completed' 之一）\n"
+        "     * summary: string（节点简要描述，简体中文）\n"
+        "     * children: array（子节点数组，每个子节点结构相同，递归定义）\n"
+        "   - node_insights: object，节点洞察字典，key 为节点 id，value 为对象，包含：\n"
+        "     * title: string（洞察标题，简体中文）\n"
+        "     * summary: string（详细描述，简体中文）\n"
+        "     * key_points: array<string>（关键要点列表，3-5 条，简体中文）\n"
+        "     * knowledge_trace: string（推理过程说明，简体中文）\n"
+        "     * knowledge_graph: object（可选，仅关键决策节点需要，包含 nodes 和 edges）\n"
+        "       - nodes: array<{id: string, label: string, type: string}>\n"
+        "       - edges: array<{source: string, target: string}>\n\n"
+        "3. 所有文本字段（label、summary、title、key_points、knowledge_trace、knowledge_graph.nodes[].label）必须使用简体中文。\n"
+        "4. status 字段只能是：'pending'、'active'、'completed' 三种之一。\n"
+        "5. knowledge_graph 中节点的 type 字段只能是：'input'、'process'、'decision'、'output' 之一。\n"
+        "6. 对于代表\"具体方案/决策\"的关键节点（例如资源匹配、编队方案、执行方案、优先级排序等），"
+        "请至少为 1-3 个此类节点补充结构化的 knowledge_graph 字段。\n"
+        "7. knowledge_graph 的 nodes 和 edges 必须形成有向无环图，能够清晰体现从任务解析 → 方案设计 → 结果输出的推理链条。\n\n"
+        f"📝 参考格式示例：\n{json_schema_example}\n\n"
+        "⚠️ 重要：\n"
+        "- 输出必须是纯 JSON，不要包含任何解释文字、Markdown 标记或代码块。\n"
+        "- 确保所有节点 id 在 behavior_tree 和 node_insights 中保持一致。\n"
+        "- node_insights 中必须为 behavior_tree 中的每个节点提供对应的洞察信息。"
     )
 
     # 优先使用匹配到的 scenario 的专项提示词，如果没有则使用通用模型提示词
@@ -87,7 +159,11 @@ def _build_prompt(
     
     if scenario is not None and scenario.prompt:
         # 使用匹配到的 scenario 的专项提示词（最精准）
-        extra_model_hint = f"\n{scenario.prompt}\n"
+        extra_model_hint = (
+            f"\n🎯 【专项场景要求】\n"
+            f"{scenario.prompt}\n"
+            f"注意：上述要求中的节点必须严格遵循 JSON 格式规范，确保所有字段类型正确。\n"
+        )
     else:
         # 如果没有 scenario 或 scenario 没有 prompt，则使用通用模型提示词
         if model_name == "越野物流":
@@ -121,10 +197,17 @@ def _build_prompt(
 
     user_instruction = (
         f"{scenario_block}"
-        f"现在的真实任务描述为：{task_description or '（空）'}。\n"
-        "请先进行任务解析（目的地/对象/时间或安全约束等），"
-        "再结合 one-shot 示例和推理链条，生成一棵清晰的行为树，以及对应的节点洞察。\n"
-        "最终只输出一个 JSON 对象，不要包含任何额外说明或 Markdown 标记。"
+        f"现在的真实任务描述为：{task_description or '（空）'}。\n\n"
+        "📌 生成要求：\n"
+        "1. 请先进行任务解析（目的地/对象/时间或安全约束等），理解任务的核心需求。\n"
+        "2. 结合 one-shot 示例和推理链条，生成一棵清晰的行为树，确保节点层级合理、逻辑连贯。\n"
+        "3. 为 behavior_tree 中的每个节点在 node_insights 中提供对应的洞察信息。\n"
+        "4. 确保所有节点 id 在 behavior_tree 和 node_insights 中保持一致。\n"
+        "5. 为关键决策节点（如最终方案、优先级排序、资源匹配等）添加 knowledge_graph。\n\n"
+        "⚠️ 输出要求：\n"
+        "- 最终只输出一个纯 JSON 对象，不要包含任何额外说明、Markdown 代码块标记（```json 或 ```）或解释文字。\n"
+        "- JSON 必须格式正确，可以被 json.loads() 直接解析。\n"
+        "- 确保所有必需字段都存在且类型正确。"
     )
 
     messages: List[Dict[str, Any]] = [
@@ -178,9 +261,22 @@ def _extract_json(content: str) -> Dict[str, Any]:
     从模型返回的文本中尽可能鲁棒地提取 JSON。
 
     - 优先直接 json.loads
-    - 若失败，则尝试截取首尾花括号之间内容再解析
+    - 若失败，则尝试移除 Markdown 代码块标记
+    - 再尝试截取首尾花括号之间内容再解析
     """
     content = content.strip()
+    
+    # 移除可能的 Markdown 代码块标记
+    if content.startswith("```"):
+        # 移除开头的 ```json 或 ```
+        lines = content.split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        # 移除结尾的 ```
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        content = "\n".join(lines).strip()
+    
     try:
         return json.loads(content)
     except json.JSONDecodeError:
@@ -189,8 +285,21 @@ def _extract_json(content: str) -> Dict[str, Any]:
         end = content.rfind("}")
         if start != -1 and end != -1 and end > start:
             snippet = content[start : end + 1]
-            return json.loads(snippet)
-        raise
+            try:
+                return json.loads(snippet)
+            except json.JSONDecodeError:
+                pass
+        
+        # 如果还是失败，尝试查找 JSON 对象（可能有多行注释）
+        # 尝试匹配第一个完整的 JSON 对象
+        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content, re.DOTALL)
+        if json_match:
+            try:
+                return json.loads(json_match.group(0))
+            except json.JSONDecodeError:
+                pass
+        
+        raise ValueError(f"无法从内容中提取有效的 JSON。内容开头：{content[:200]}")
 
 
 def generate_blueprint_with_llm(
@@ -208,8 +317,26 @@ def generate_blueprint_with_llm(
     )
     scenario, score = best
 
-    # 可以根据相似度阈值决定是否使用场景信息，这里只要找到就使用
-    messages = _build_prompt(model_name=model_name, task_description=task_description, scenario=scenario)
+    # 若与某个预设场景的 example_input 相似度 >= 0.9，且该场景预置了标准 example_output，
+    # 则直接返回该标准蓝图，不再调用大模型，以保证结果稳定且粒度一致。
+    if scenario is not None and score >= 0.9 and getattr(scenario, "example_output", None):
+        print(
+            f"[LLM] 命中高相似度标准场景，直接返回预置 example_output: "
+            f"support_model={model_name}, scenario_id={scenario.id}, score={score:.3f}",
+            file=sys.stderr,
+        )
+        return BlueprintResult(
+            blueprint=scenario.example_output,  # type: ignore[arg-type]
+            scenario=scenario,
+            raw_content="__STATIC_EXAMPLE_OUTPUT__",
+        )
+
+    # 否则使用匹配到的场景提示词，构造对话调用大模型生成蓝图
+    messages = _build_prompt(
+        model_name=model_name,
+        task_description=task_description,
+        scenario=scenario,
+    )
 
     client = _get_client()
     print(
@@ -234,7 +361,71 @@ def generate_blueprint_with_llm(
         raw_content = str(message.content or "")
 
     print("[LLM] 蓝图生成完成，开始解析 JSON", file=sys.stderr)
-    blueprint = _extract_json(raw_content)
+    try:
+        blueprint = _extract_json(raw_content)
+        
+        # 验证蓝图结构
+        if not isinstance(blueprint, dict):
+            raise ValueError("蓝图必须是字典类型")
+        
+        if "behavior_tree" not in blueprint:
+            raise ValueError("蓝图缺少 'behavior_tree' 字段")
+        
+        if "node_insights" not in blueprint:
+            raise ValueError("蓝图缺少 'node_insights' 字段")
+        
+        # 验证 behavior_tree 结构
+        tree = blueprint["behavior_tree"]
+        if not isinstance(tree, dict):
+            raise ValueError("behavior_tree 必须是字典类型")
+        
+        required_tree_fields = ["id", "label", "status", "summary", "children"]
+        for field in required_tree_fields:
+            if field not in tree:
+                raise ValueError(f"behavior_tree 缺少必需字段: {field}")
+        
+        # 验证 status 值
+        if tree["status"] not in ["pending", "active", "completed"]:
+            print(f"[LLM] 警告: behavior_tree.status 值 '{tree['status']}' 不在标准值列表中，将使用 'pending'", file=sys.stderr)
+            tree["status"] = "pending"
+        
+        # 验证 node_insights 结构
+        insights = blueprint["node_insights"]
+        if not isinstance(insights, dict):
+            raise ValueError("node_insights 必须是字典类型")
+        
+        # 验证每个节点的洞察信息
+        for node_id, insight in insights.items():
+            if not isinstance(insight, dict):
+                print(f"[LLM] 警告: 节点 {node_id} 的洞察信息不是字典类型，将使用默认值", file=sys.stderr)
+                continue
+            
+            required_insight_fields = ["title", "summary", "key_points", "knowledge_trace"]
+            for field in required_insight_fields:
+                if field not in insight:
+                    print(f"[LLM] 警告: 节点 {node_id} 的洞察信息缺少字段 '{field}'，将使用默认值", file=sys.stderr)
+                    if field == "key_points":
+                        insight[field] = []
+                    else:
+                        insight[field] = ""
+            
+            # 验证 knowledge_graph（如果存在）
+            if "knowledge_graph" in insight:
+                kg = insight["knowledge_graph"]
+                if not isinstance(kg, dict):
+                    print(f"[LLM] 警告: 节点 {node_id} 的 knowledge_graph 不是字典类型，将移除", file=sys.stderr)
+                    del insight["knowledge_graph"]
+                else:
+                    if "nodes" not in kg or "edges" not in kg:
+                        print(f"[LLM] 警告: 节点 {node_id} 的 knowledge_graph 缺少 nodes 或 edges，将移除", file=sys.stderr)
+                        del insight["knowledge_graph"]
+        
+        print("[LLM] 蓝图结构验证通过", file=sys.stderr)
+        
+    except (ValueError, json.JSONDecodeError) as e:
+        print(f"[LLM] 蓝图解析或验证失败: {e}", file=sys.stderr)
+        print(f"[LLM] 原始内容前500字符: {raw_content[:500]}", file=sys.stderr)
+        raise
 
     return BlueprintResult(
         blueprint=blueprint,

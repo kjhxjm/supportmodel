@@ -58,7 +58,7 @@ def parse_task_description(task_description):
         road_conditions.append("泥泞路面")
     if "碎石" in task_description or "石子" in task_description:
         road_conditions.append("碎石路段")
-    if "不确定损毁" in task_description or "损毁" in task_description:
+    if "不确定损毁" in task_description or "损毁" in task_description or "受损" in task_description:
         road_conditions.append("道路损毁")
     if "风险" in task_description:
         road_conditions.append("高风险路段")
@@ -87,7 +87,7 @@ def generate_dynamic_behavior_tree(task_description):
                 "id": "route_analysis",
                 "label": "路线风险评估",
                 "status": "completed",
-                "summary": f"评估道路条件：{', '.join(parsed_info.get('road_conditions', ['未知路况']))}",
+                "summary": f"评估道路条件：{', '.join(parsed_info.get('road_conditions') or ['未知路况'])}",
                 "children": [
                     {
                         "id": "terrain_scan",
@@ -115,7 +115,7 @@ def generate_dynamic_behavior_tree(task_description):
                         "id": "vehicle_selection",
                         "label": f"✅ 车辆选择：{vehicle_type}",
                         "status": "completed",
-                        "summary": f"推理选择：{vehicle_type}（理由：载重能力与地形适应性匹配{parsed_info.get('road_conditions', ['复杂路况'])[0]}）",
+                        "summary": f"推理选择：{vehicle_type}（理由：载重能力与地形适应性匹配{(parsed_info.get('road_conditions') or ['复杂路况'])[0]}）",
                         "children": []
                     },
                     {
@@ -178,17 +178,17 @@ def generate_dynamic_blueprint(task_description):
     node_insights = {
         "task_analysis": {
             "title": "任务分析与规划",
-            "summary": f"解析任务需求：向{parsed_info.get('destination', '目标地点')}运输{parsed_info.get('cargo', '物资')}，考虑{', '.join(parsed_info.get('road_conditions', ['复杂路况']))}，{parsed_info.get('time_limit', '确保按时')}完成。",
+            "summary": f"解析任务需求：向{parsed_info.get('destination', '目标地点')}运输{parsed_info.get('cargo', '物资')}，考虑{', '.join(parsed_info.get('road_conditions') or ['复杂路况'])}，{parsed_info.get('time_limit', '确保按时')}完成。",
             "key_points": [
                 "任务目标识别：运输任务的具体要求",
                 "约束条件分析：时间、路况、安全等限制",
                 "资源需求评估：所需车辆和装备类型"
             ],
-            "knowledge_trace": f"任务解析（运输、{parsed_info.get('cargo', '物资')}、{parsed_info.get('time_limit', '时限')}、{', '.join(parsed_info.get('road_conditions', ['路况']))}）→ 综合规划。"
+            "knowledge_trace": f"任务解析（运输、{parsed_info.get('cargo', '物资')}、{parsed_info.get('time_limit', '时限')}、{', '.join(parsed_info.get('road_conditions') or ['路况'])}）→ 综合规划。"
         },
         "route_analysis": {
             "title": "路线风险评估",
-            "summary": f"对运输路线的全面风险评估，重点关注{', '.join(parsed_info.get('road_conditions', ['道路状况']))}。",
+            "summary": f"对运输路线的全面风险评估，重点关注{', '.join(parsed_info.get('road_conditions') or ['道路状况'])}。",
             "key_points": [
                 "地形特征分析：坡度、土壤、通行条件",
                 "风险点识别：潜在障碍和危险区域",
@@ -208,7 +208,7 @@ def generate_dynamic_blueprint(task_description):
         },
         "risk_assessment": {
             "title": "风险评估",
-            "summary": f"综合评估道路风险，特别关注{', '.join(parsed_info.get('road_conditions', ['不确定因素']))}。",
+            "summary": f"综合评估道路风险，特别关注{', '.join(parsed_info.get('road_conditions') or ['不确定因素'])}。",
             "key_points": [
                 "风险因素识别：陷车、侧翻、延误等",
                 "概率计算：基于历史数据和当前条件",
@@ -222,12 +222,12 @@ def generate_dynamic_blueprint(task_description):
             "key_points": [
                 f"📍 任务目标：向{parsed_info.get('destination', '目标地点')}运输{parsed_info.get('cargo', '物资')}",
                 f"⏰ 时间要求：{parsed_info.get('time_limit', '限时完成')}",
-                f"🛣️ 道路条件：{', '.join(parsed_info.get('road_conditions', ['复杂路况']))}",
+                f"🛣️ 道路条件：{', '.join(parsed_info.get('road_conditions') or ['复杂路况'])}",
                 f"🚛 车辆选择：{vehicle_type}（载重50kg，适应越野路况）",
                 f"🔢 数量计算：{vehicle_count}辆（{parsed_info.get('cargo', '物资')}80kg ÷ 单车50kg + 20%冗余）",
                 f"📦 装载方案：{loading_plan}"
             ],
-            "knowledge_trace": f"任务解析（运输、{parsed_info.get('cargo', '物资')}、{parsed_info.get('time_limit', '时限')}、{', '.join(parsed_info.get('road_conditions', ['路况']))}）→ 车辆类型匹配（选择{vehicle_type}，理由：载重能力与地形适应性匹配{parsed_info.get('road_conditions', ['复杂路况'])[0]}）→ 数量计算（基于单车载重50kg和冗余要求，推导出需要{vehicle_count}辆车）→ 装载方案（{loading_plan}）。",
+            "knowledge_trace": f"任务解析（运输、{parsed_info.get('cargo', '物资')}、{parsed_info.get('time_limit', '时限')}、{', '.join(parsed_info.get('road_conditions') or ['路况'])}）→ 车辆类型匹配（选择{vehicle_type}，理由：载重能力与地形适应性匹配{(parsed_info.get('road_conditions') or ['复杂路况'])[0]}）→ 数量计算（基于单车载重50kg和冗余要求，推导出需要{vehicle_count}辆车）→ 装载方案（{loading_plan}）。",
             "knowledge_graph": {
                 "nodes": [
                     {"id": "task_parsing", "label": f"任务解析(运输{parsed_info.get('cargo', '物资')}→{parsed_info.get('destination', '目标')})", "type": "input"},

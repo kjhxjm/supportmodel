@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -15,6 +15,8 @@ class Scenario:
     example_input: str
     reasoning_chain: str
     prompt: Optional[str] = None  # 该场景的专项要求提示词，用于细化蓝图生成要求
+    # 当用户任务描述与 example_input 相似度 > 0.9 时，可直接返回该标准输出而不调用大模型
+    example_output: Optional[Dict[str, Any]] = None
 
 
 # 表1的 20 条测试项目 one-shot 场景。
@@ -27,19 +29,236 @@ SCENARIOS: List[Scenario] = [
         example_input="向位置X运输资源Y，道路存在不确定损毁风险，要求2小时内送达。",
         reasoning_chain="任务解析（运输、重量、时限、路况）→ 车辆类型匹配（选择中型越野无人车，理由：载重能力与地形适应性）→ 数量计算（基于单车载重和冗余要求推导车辆数量）→ 装载方案（物资分配与固定方式）",
         prompt=(
-            "【任务编组专项要求】\n"
-            "1. 行为树必须包含以下核心节点，严格按照推理链条顺序组织：\n"
-            "   - task_analysis（任务分析与规划）：解析目的地、货物类型、重量、时间限制、道路条件等关键要素；\n"
-            "   - vehicle_selection（车辆类型匹配）：根据载重能力、地形适应性、可靠性选择具体车辆类型（如中型越野无人车），并说明选择理由；\n"
-            "   - quantity_calculation（数量计算）：基于单车载重、总货物重量、冗余要求（如备份车辆）推导所需车辆数量；\n"
-            "   - loading_plan（装载方案）：详细规划每辆车的物资分配比例、固定方式、重心平衡等；\n"
-            "   - fleet_formation（车队编成推理结果）：汇总上述推理，输出最终的车队配置方案，此节点必须包含 knowledge_graph 字段。\n"
-            "2. fleet_formation 节点的 knowledge_graph 必须包含如下因果链路：\n"
-            "   任务解析(task_parsing) → 车辆匹配(vehicle_matching) → 数量计算(quantity_calc) → 装载方案(loading_scheme) → 最终配置(fleet_config)\n"
-            "   每个节点需有清晰的 label（中文），edges 需明确表示因果关系。\n"
-            "3. 在 node_insights 中，为每个节点提供详细的 summary、3-5 条 key_points，以及连贯的 knowledge_trace，"
-            "   体现从任务解析到最终编队方案的完整推理过程。"
+            "【越野物流-任务编组专项要求】\n"
+            "1. 行为树必须至少包含以下核心节点，且严格按照推理链条自上而下展开：\n"
+            "   - task_analysis（任务分析与规划，根节点）：\n"
+            "       * 明确目的地、货物类型与重量、时间限制、道路条件（泥泞/碎石/损毁风险等）、安全要求；\n"
+            "       * 至少拆分出“任务要素提取”“约束条件识别”两个子层级节点；\n"
+            "   - route_analysis（路线风险评估）：\n"
+            "       * 至少包含 terrain_scan（地形扫描）和 risk_assessment（风险评估）两个子节点；\n"
+            "   - fleet_formation（车队编成推理结果，核心决策节点）：\n"
+            "       * 下方必须细化出 vehicle_selection（车辆类型匹配）、quantity_calculation（数量计算）、loading_plan（装载方案）三个子节点；\n"
+            "       * 该节点必须包含 knowledge_graph 字段。\n"
+            "2. fleet_formation 节点的 knowledge_graph 必须体现完整因果链路：\n"
+            "   任务解析(task_parsing) → 车辆匹配(vehicle_matching) → 数量计算(quantity_calc) → 装载方案(loading_scheme) → 最终配置(fleet_config)，\n"
+            "   且 nodes[].label 需给出简洁的中文描述，edges 明确表示推理方向。\n"
+            "3. 在 node_insights 中：\n"
+            "   - 为 behavior_tree 中出现的每一个节点（包括子节点）提供详细的 summary、3-5 条 key_points，以及连贯的 knowledge_trace；\n"
+            "   - 对 vehicle_selection、quantity_calculation、loading_plan、fleet_formation 这四个节点，必须给出可用于教学展示的“计算/推理细节”，\n"
+            "     如：单车载重假设、冗余比例、装载比例、车辆类型与路况匹配理由等；\n"
+            "   - knowledge_trace 应以“任务解析 → 路线分析 → 车辆/数量/装载推理 → 最终编队方案”的顺序，清晰展示推理路径。"
         ),
+        example_output={
+            "default_focus": "fleet_formation",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "🚛 任务编组：2辆中型越野无人车运输资源Y",
+                "status": "completed",
+                "summary": "解析任务：在2小时内，将资源Y从当前位置运输至位置X，道路存在不确定损毁风险，需要形成具备冗余能力的越野车队编组方案。",
+                "children": [
+                    {
+                        "id": "route_analysis",
+                        "label": "路线风险评估",
+                        "status": "completed",
+                        "summary": "综合评估前往位置X可能遇到的道路损毁、高风险路段等因素，为后续车辆选择与装载方案提供约束条件。",
+                        "children": [
+                            {
+                                "id": "terrain_scan",
+                                "label": "地形扫描",
+                                "status": "completed",
+                                "summary": "扫描前往位置X沿途的坡度、土壤与障碍物分布，标注潜在陷车与侧翻区域。",
+                                "children": []
+                            },
+                            {
+                                "id": "risk_assessment",
+                                "label": "风险评估",
+                                "status": "completed",
+                                "summary": "基于地形与道路损毁信息，估计通行成功率与备选绕行路径，为车队编组提供安全边界。",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "id": "fleet_formation",
+                        "label": "✅ 车队编成结果：2辆中型越野无人车",
+                        "status": "active",
+                        "summary": "在2小时时限与道路损毁风险约束下，选择2辆中型越野无人车运输资源Y，其中车辆1装载60%，车辆2装载40%作为冗余备份。",
+                        "children": [
+                            {
+                                "id": "vehicle_selection",
+                                "label": "✅ 车辆类型匹配：中型越野无人车",
+                                "status": "completed",
+                                "summary": "车辆具备约50kg 级载重与越野悬挂能力，适应碎石与损毁混合路段。",
+                                "children": []
+                            },
+                            {
+                                "id": "quantity_calculation",
+                                "label": "✅ 数量计算：2辆",
+                                "status": "completed",
+                                "summary": "根据资源Y总重量与单车载重能力，叠加20% 冗余，推导至少需要2辆车以保证任务完成与故障备份。",
+                                "children": []
+                            },
+                            {
+                                "id": "loading_plan",
+                                "label": "✅ 装载方案：1车60%，1车40%",
+                                "status": "completed",
+                                "summary": "车辆1承担主运输负载，车辆2作为冗余与补充载荷，兼顾重量平衡与故障冗余。",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "id": "execution_plan",
+                        "label": "执行方案",
+                        "status": "pending",
+                        "summary": "在满足2小时内送达的前提下，编制发车时间、途中检查点与返程预案。",
+                        "children": [
+                            {
+                                "id": "route_optimization",
+                                "label": "路线优化",
+                                "status": "pending",
+                                "summary": "在可选路径中优选兼顾时间与安全性的路线，必要时预留一条备选绕行路径。",
+                                "children": []
+                            },
+                            {
+                                "id": "schedule_arrangement",
+                                "label": "调度安排",
+                                "status": "pending",
+                                "summary": "结合2小时时限与路况风险，确定发车时间、行驶速度与途中安全检查节奏。",
+                                "children": []
+                            }
+                        ]
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务分析与规划",
+                    "summary": "对“向位置X运输资源Y，道路存在不确定损毁风险，要求2小时内送达”的任务进行结构化解析，明确目的地、货物、时间与路况约束。",
+                    "key_points": [
+                        "抽取任务要素：位置X、资源Y、2小时时限、不确定道路损毁风险",
+                        "区分硬性约束（时限、安全）与软性约束（舒适性、效率）",
+                        "为路线评估与车队编成提供统一的数据输入框架"
+                    ],
+                    "knowledge_trace": "任务文本解析 → 目的地/货物/时间/路况要素抽取 → 形成可供后续节点复用的标准任务描述。"
+                },
+                "route_analysis": {
+                    "title": "路线风险评估",
+                    "summary": "围绕道路不确定损毁风险，综合分析前往位置X的路线条件与潜在危险点。",
+                    "key_points": [
+                        "基于历史地图与实时侦察信息识别可能损毁路段",
+                        "将坡度、路面附着系数等转化为通行成功率指标",
+                        "为车辆选择与数量冗余计算提供风险输入参数"
+                    ],
+                    "knowledge_trace": "地形数据与侦察信息融合 → 风险因子量化 → 向车队编成节点输出风险等级。"
+                },
+                "terrain_scan": {
+                    "title": "地形扫描",
+                    "summary": "利用卫星影像、先验地图与传感器数据获取路段坡度、凹凸度与障碍分布。",
+                    "key_points": [
+                        "读取位置X周边的多源地形/路况数据",
+                        "对泥泞、碎石、塌陷等路面特征进行分类标注",
+                        "形成用于车辆适应性评估的地形剖面"
+                    ],
+                    "knowledge_trace": "数据采集 → 特征提取 → 生成可视化地形剖面供风险评估与车辆匹配使用。"
+                },
+                "risk_assessment": {
+                    "title": "风险评估",
+                    "summary": "结合地形扫描结果与任务时限，估计不同路径的陷车概率与通过时间区间。",
+                    "key_points": [
+                        "为各路段打分：通行难度、潜在损毁程度、绕行成本",
+                        "识别必须避开的高风险区段并标注为禁行",
+                        "输出候选主路线与备选路线，为后续编队与调度提供依据"
+                    ],
+                    "knowledge_trace": "路段评分 → 组合成路径方案 → 筛选主备路线并输出给车队编成与执行方案节点。"
+                },
+                "fleet_formation": {
+                    "title": "车队编成推理结果",
+                    "summary": "在2小时时限与道路损毁风险约束下，选择2辆中型越野无人车并给出主/备装载方案，保证任务完成与故障冗余。",
+                    "key_points": [
+                        "在车辆类型候选集中筛选具备越野能力与稳定性的中型平台",
+                        "基于资源Y重量、单车载重与20%冗余假设推导出2辆车配置",
+                        "制定“1车60%+1车40%”的装载比例以兼顾利用率与故障冗余"
+                    ],
+                    "knowledge_trace": "任务与路况要素 → 车辆类型筛选 → 数量与冗余计算 → 装载比例设计 → 形成最终车队编成方案。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "task_parsing", "label": "任务解析(位置X, 资源Y, 2小时, 道路损毁风险)", "type": "input"},
+                            {"id": "vehicle_matching", "label": "车辆匹配(中型越野无人车)", "type": "process"},
+                            {"id": "quantity_calc", "label": "数量计算(2辆, 含20%冗余)", "type": "process"},
+                            {"id": "loading_scheme", "label": "装载方案(1车60%,1车40%)", "type": "decision"},
+                            {"id": "fleet_config", "label": "最终配置(2辆中型越野无人车)", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "task_parsing", "target": "vehicle_matching"},
+                            {"source": "vehicle_matching", "target": "quantity_calc"},
+                            {"source": "quantity_calc", "target": "loading_scheme"},
+                            {"source": "loading_scheme", "target": "fleet_config"}
+                        ]
+                    }
+                },
+                "vehicle_selection": {
+                    "title": "车辆类型匹配",
+                    "summary": "在道路存在不确定损毁风险的情况下，选择具备越野能力的中型无人车作为运输平台。",
+                    "key_points": [
+                        "假定单车载重能力约50kg，满足资源Y总重量需求",
+                        "越野悬挂与轮胎/履带设计适配泥泞与损毁混合路段",
+                        "考虑可靠性与维护便利性，优先选用成熟型号"
+                    ],
+                    "knowledge_trace": "路况与载重需求 → 候选车型能力对比 → 选定中型越野无人车作为基准平台。"
+                },
+                "quantity_calculation": {
+                    "title": "数量计算",
+                    "summary": "依据资源Y总重量、单车载重与20% 冗余要求，推导需要2辆车以保证运输成功与故障备份。",
+                    "key_points": [
+                        "计算理论最少车辆数量 = 资源总量 ÷ 单车载重",
+                        "在理论最少基础上增加20%冗余，向上取整得到2辆车",
+                        "验证在一辆车失效情况下仍能在2小时内完成运输"
+                    ],
+                    "knowledge_trace": "载重需求建模 → 理论车辆数计算 → 加入冗余系数并验证任务完成可能性。"
+                },
+                "loading_plan": {
+                    "title": "装载方案",
+                    "summary": "将资源Y按60%/40%划分至两辆车，以提升故障冗余与重量平衡。",
+                    "key_points": [
+                        "车辆1作为主运输载具，承担约60% 货物以提高利用率",
+                        "车辆2承担40% 货物，兼具补充运输与故障接替功能",
+                        "在每辆车内部按照重心与绑扎要求进行分层固定"
+                    ],
+                    "knowledge_trace": "资源总量与车辆数量 → 主/备功能划分 → 按比例分配并结合车体结构设计装载细节。"
+                },
+                "execution_plan": {
+                    "title": "执行方案",
+                    "summary": "围绕“2小时内到达位置X”的目标制定发车节奏、途中检查点与返程路径预案。",
+                    "key_points": [
+                        "根据路径长度与路况估算行驶时间与安全余量",
+                        "设置关键路段的减速检查与通信打点",
+                        "规划返程路径与途中补给/维护节点"
+                    ],
+                    "knowledge_trace": "时间约束与路径评估 → 行程与检查点规划 → 形成可执行的任务时间表。"
+                },
+                "route_optimization": {
+                    "title": "路线优化",
+                    "summary": "在安全前提下尽量压缩行程时间，同时预留绕行能力。",
+                    "key_points": [
+                        "比较多条可行路线的时间消耗与风险等级",
+                        "对高风险路段设置备选绕行路径",
+                        "将路线决策结果传递给调度与驾驶控制模块"
+                    ],
+                    "knowledge_trace": "多路径评估 → 主路线选择 → 备选绕行策略绑定。"
+                },
+                "schedule_arrangement": {
+                    "title": "调度安排",
+                    "summary": "在2小时时限内合理安排发车时间与途中停靠检查节奏，保证安全与准时兼顾。",
+                    "key_points": [
+                        "预留装载与出发前检查时间窗口",
+                        "将关键路段通过时间与检查点事件写入时间表",
+                        "为延误或路况突变预留时间缓冲区"
+                    ],
+                    "knowledge_trace": "时间约束与路径计划 → 细化为时间节点与事件列表 → 下发至执行单元进行调度控制。"
+                }
+            }
+        },
     ),
     Scenario(
         id="offroad_dynamic_routing",  # 2. 动态路径规划与重规划
@@ -48,18 +267,146 @@ SCENARIOS: List[Scenario] = [
         example_input="向X位置运输资源Y，道路可能受损",
         reasoning_chain="路径规划（读取地图与路况信息生成初始路径）→ 异常感知与处理（感知数据异常，派遣无人机/机器狗抵近观察）→ 路径重规划（综合车队状态、地图与异常信息重新规划可行路径）",
         prompt=(
-            "【动态路径规划与重规划专项要求】\n"
+            "【越野物流-动态路径规划与重规划专项要求（粒度强化版）】\n"
             "1. 行为树必须包含以下核心节点：\n"
-            "   - task_analysis（任务解析）：解析目的地、货物、时间要求等；\n"
-            "   - route_planning（路径规划）：读取地图与路况信息，生成初始可行路径，评估路径长度、风险等级、预计时间；\n"
-            "   - anomaly_detection（异常感知与处理）：实时监测感知数据异常（如道路损毁、障碍物、天气变化），"
-            "     派遣无人机/机器狗抵近观察，收集详细环境信息；\n"
-            "   - route_replanning（路径重规划）：综合车队当前状态、地图信息、异常感知结果，重新规划可行路径，"
-            "     此节点必须包含 knowledge_graph 字段。\n"
-            "2. route_replanning 节点的 knowledge_graph 应体现：\n"
-            "   初始路径(initial_route) → 异常感知(anomaly_detection) → 环境评估(env_assessment) → 路径优化(route_optimization) → 新路径生成(new_route)\n"
-            "3. 在 node_insights 中，重点描述异常感知的触发条件、重规划的决策依据，以及新旧路径的对比分析。"
+            "   - task_analysis（任务解析）：\n"
+            "       * 明确目的地X、资源Y与时间/安全等基础约束；\n"
+            "   - route_planning（初始路径规划）：\n"
+            "       * 至少细分出 path_generation（路径生成）与 path_evaluation（路径评估）两个子节点；\n"
+            "   - anomaly_detection（异常感知与处理）：\n"
+            "       * 体现感知数据异常→触发无人机/机器狗抵近观察→回传异常信息的链条；\n"
+            "   - route_replanning（路径重规划，核心决策节点）：\n"
+            "       * 综合初始路径、异常信息、车队状态重新生成新路径，必须包含 knowledge_graph 字段。\n"
+            "2. route_replanning 节点的 knowledge_graph 必须体现：\n"
+            "   初始路径(initial_route) → 异常感知(anomaly_detection) → 环境评估(env_assessment) → 路径优化(route_optimization) → 新路径生成(new_route)。\n"
+            "3. node_insights 要求：\n"
+            "   - 对 anomaly_detection、route_replanning 详细描述触发条件、传感器类型、决策依据与新旧路径对比要点；\n"
+            "   - knowledge_trace 需完整刻画“初始规划 → 异常发现 → 信息补充 → 重规划”四段式逻辑。"
         ),
+        example_output={
+            "default_focus": "route_replanning",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "🚛 任务解析：前往X位置运输资源Y",
+                "status": "completed",
+                "summary": "解析任务：向位置X运输资源Y，道路可能受损，需要具备动态路径调整能力的越野运输方案。",
+                "children": [
+                    {
+                        "id": "route_planning",
+                        "label": "初始路径规划",
+                        "status": "completed",
+                        "summary": "基于地图与既有路况信息生成一条可行的初始路径，并评估时间与风险等级。",
+                        "children": [
+                            {
+                                "id": "path_generation",
+                                "label": "路径生成",
+                                "status": "completed",
+                                "summary": "从当前位置到位置X自动生成若干候选路径。",
+                                "children": []
+                            },
+                            {
+                                "id": "path_evaluation",
+                                "label": "路径评估",
+                                "status": "completed",
+                                "summary": "综合距离、预计时间与已知受损路段对候选路径打分，选出初始主路径。",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "id": "anomaly_detection",
+                        "label": "异常感知与处理",
+                        "status": "active",
+                        "summary": "在执行过程中实时监控道路受损、障碍物与天气变化，必要时派遣无人机/机器狗抵近观察并回传细节。",
+                        "children": []
+                    },
+                    {
+                        "id": "route_replanning",
+                        "label": "路径重规划",
+                        "status": "pending",
+                        "summary": "融合初始路径、异常感知结果与车队状态，对原路径进行调整或重新规划生成新路径。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务解析",
+                    "summary": "明确任务目标为“将资源Y运输至位置X”，道路可能受损，对路径规划提出安全与鲁棒性要求。",
+                    "key_points": [
+                        "识别目的地X与货物Y等核心任务参数",
+                        "将“道路可能受损”转化为路径可靠性约束",
+                        "为后续路径规划与异常感知模块提供统一任务上下文"
+                    ],
+                    "knowledge_trace": "任务文本 → 目的地与货物抽取 → 风险约束建模 → 输出给路径规划与异常感知节点。"
+                },
+                "route_planning": {
+                    "title": "初始路径规划",
+                    "summary": "在任务开始前生成一条时间与安全性均可接受的初始运输路径。",
+                    "key_points": [
+                        "利用地图数据和历史路况生成多条候选路径",
+                        "对每条路径计算距离、预计时间与已知风险权重",
+                        "选择综合评分最高的路径作为主路径，并记录可行备选路径"
+                    ],
+                    "knowledge_trace": "候选路径生成 → 指标计算与加权 → 主/备路径筛选。"
+                },
+                "path_generation": {
+                    "title": "路径生成",
+                    "summary": "基于拓扑路网结构从起点到位置X生成若干连通路径。",
+                    "key_points": [
+                        "在路网图上搜索多条从起点到X的连通路径",
+                        "剔除明显不可行或超出任务时限的路径",
+                        "保留满足基本约束的路径集合供评估模块使用"
+                    ],
+                    "knowledge_trace": "路网拓扑 → 多路径搜索 → 过滤不可行路径并输出候选集。"
+                },
+                "path_evaluation": {
+                    "title": "路径评估",
+                    "summary": "对候选路径进行距离、时间与损毁风险打分，输出排序结果。",
+                    "key_points": [
+                        "计算每条路径的总距离与预计行驶时间",
+                        "叠加历史损毁记录与已知障碍物信息形成风险得分",
+                        "按综合评分排序，选出主路径与若干备选路径"
+                    ],
+                    "knowledge_trace": "指标计算 → 加权打分 → 主/备路径排序输出。"
+                },
+                "anomaly_detection": {
+                    "title": "异常感知与处理",
+                    "summary": "在任务执行中持续监听传感器与外部情报，一旦发现异常路段，触发抵近观察与路径重评估。",
+                    "key_points": [
+                        "监控激光雷达、视觉与惯性导航数据的异常模式",
+                        "当检测到严重受损或阻断迹象时，发起无人机/机器狗抵近侦察",
+                        "将实测路况与原始地图对比，更新路段通行状态"
+                    ],
+                    "knowledge_trace": "在线监控 → 异常触发 → 抵近观察 → 通行状态更新并通知重规划模块。"
+                },
+                "route_replanning": {
+                    "title": "路径重规划",
+                    "summary": "结合初始路径、异常感知结果与车队剩余时间/油量等状态，生成新的最优路径或启用备选路径。",
+                    "key_points": [
+                        "将异常阻断路段标记为禁行或高代价边",
+                        "在更新后的路网中重新执行路径搜索与评估",
+                        "比较新路径与原路径的时间与风险差异，形成调整建议"
+                    ],
+                    "knowledge_trace": "路网状态更新 → 新路径搜索与评估 → 新旧路径对比 → 输出重规划结果并同步给执行控制。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "initial_route", "label": "初始路径", "type": "input"},
+                            {"id": "anomaly_detection", "label": "异常感知结果", "type": "input"},
+                            {"id": "env_assessment", "label": "环境评估与路网更新", "type": "process"},
+                            {"id": "route_optimization", "label": "路径优化决策", "type": "decision"},
+                            {"id": "new_route", "label": "新路径生成", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "initial_route", "target": "env_assessment"},
+                            {"source": "anomaly_detection", "target": "env_assessment"},
+                            {"source": "env_assessment", "target": "route_optimization"},
+                            {"source": "route_optimization", "target": "new_route"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="offroad_cargo_monitor",  # 3. 货物状态监控
@@ -68,18 +415,107 @@ SCENARIOS: List[Scenario] = [
         example_input="向X位置运输冷冻食品Y",
         reasoning_chain="货物运输要求（温度等约束）→ 车辆匹配（选择具备温度传感器和保温/制冷能力的车辆）→ 异常感知与处理（设定温度采集频率，登记并上报温度异常，触发保全策略）",
         prompt=(
-            "【货物状态监控与保全专项要求】\n"
-            "1. 行为树必须包含以下核心节点：\n"
-            "   - task_analysis（任务解析）：解析货物类型、特殊运输要求（如温度、湿度、防震等约束条件）；\n"
-            "   - vehicle_matching（车辆匹配）：根据货物特殊要求，选择具备相应传感器和调控能力的车辆"
-            "     （如温度传感器、保温/制冷系统、湿度控制等），说明匹配理由；\n"
-            "   - monitoring_setup（监控设置）：设定传感器采集频率、监控阈值、告警条件等；\n"
-            "   - anomaly_handling（异常感知与处理）：实时监测货物状态，登记并上报异常（如温度超标、震动过大），"
-            "     触发保全策略（如调整温度、减速行驶、紧急停车等），此节点必须包含 knowledge_graph 字段。\n"
-            "2. anomaly_handling 节点的 knowledge_graph 应体现：\n"
-            "   状态监测(status_monitoring) → 异常识别(anomaly_detection) → 风险评估(risk_assessment) → 保全策略(preservation_strategy) → 执行响应(action_response)\n"
-            "3. 在 node_insights 中，详细说明监控参数设置、异常判定标准、保全策略的具体措施。"
+            "【越野物流-货物状态监控与保全专项要求（粒度强化版）】\n"
+            "1. 行为树必须包含：\n"
+            "   - task_analysis（任务解析）：解析“冷冻食品Y”对温度、湿度、震动的要求；\n"
+            "   - vehicle_matching（车辆匹配）：细化为传感器配置、制冷/保温能力匹配等子要点；\n"
+            "   - monitoring_setup（监控设置）：必须明确采样频率、告警阈值、上报周期；\n"
+            "   - anomaly_handling（异常感知与处理，核心决策节点）：实时监控温度/震动等参数并触发保全策略，必须包含 knowledge_graph。\n"
+            "2. anomaly_handling 节点的 knowledge_graph 必须体现：\n"
+            "   状态监测(status_monitoring) → 异常识别(anomaly_detection) → 风险评估(risk_assessment) → 保全策略(preservation_strategy) → 执行响应(action_response)。\n"
+            "3. node_insights 要求：\n"
+            "   - 对监控参数设置、告警阈值设计与保全动作（调温、减速、改道、紧急停车等）进行条目化说明；\n"
+            "   - knowledge_trace 体现“持续监控 → 及时告警 → 策略选择 → 行动闭环”的全过程。"
         ),
+        example_output={
+            "default_focus": "anomaly_handling",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "🚛 任务解析：向X位置运输冷冻食品Y",
+                "status": "completed",
+                "summary": "解析冷冻食品Y的运输要求：保持在规定低温区间，尽量避免剧烈震动，确保全程冷链不中断。",
+                "children": [
+                    {
+                        "id": "vehicle_matching",
+                        "label": "车辆匹配",
+                        "status": "completed",
+                        "summary": "选择具备冷链仓、温度传感器与基础减震能力的越野运输车辆。",
+                        "children": []
+                    },
+                    {
+                        "id": "monitoring_setup",
+                        "label": "监控设置",
+                        "status": "completed",
+                        "summary": "配置温度与震动传感器采样频率、告警阈值与上报策略。",
+                        "children": []
+                    },
+                    {
+                        "id": "anomaly_handling",
+                        "label": "异常感知与处理",
+                        "status": "active",
+                        "summary": "实时监测冷链仓温度和运输震动情况，一旦异常立即触发保全策略并记录闭环结果。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务解析",
+                    "summary": "将“向X位置运输冷冻食品Y”拆解为温度控制、震动限制与时效约束三个关键方面。",
+                    "key_points": [
+                        "识别冷冻食品Y对温度区间的严格约束（如 -18℃ 以下）",
+                        "考虑越野路面带来的震动风险对包装与产品质量的影响",
+                        "评估运输时长对冷链设备持续工作的要求"
+                    ],
+                    "knowledge_trace": "货物属性分析 → 约束条件抽取 → 形成冷链运输任务配置。"
+                },
+                "vehicle_matching": {
+                    "title": "车辆匹配",
+                    "summary": "在可用车辆中选择具备冷链舱、温度传感器与适度减震能力的越野平台。",
+                    "key_points": [
+                        "筛选具备密闭冷链舱与独立制冷单元的车辆",
+                        "确保车体具备足够的悬挂行程以降低越野震动",
+                        "确认电源与制冷能力可以覆盖任务全程"
+                    ],
+                    "knowledge_trace": "货物冷链需求 → 车辆配置筛查 → 选定满足温控与减震能力的车辆。"
+                },
+                "monitoring_setup": {
+                    "title": "监控设置",
+                    "summary": "为冷链仓配置温度与震动监控方案，设置采样频率与多级告警阈值。",
+                    "key_points": [
+                        "设定温度传感器高/低阈值与连续超限判定时间窗",
+                        "配置震动传感器的采样频率与峰值/均方根告警标准",
+                        "定义正常上报周期与异常时的加密快速上报机制"
+                    ],
+                    "knowledge_trace": "监控参数设计 → 阈值与频率配置 → 与告警与上报逻辑绑定。"
+                },
+                "anomaly_handling": {
+                    "title": "异常感知与处理",
+                    "summary": "在发现温度或震动异常时，快速评估风险等级并触发调温、减速或停车等保全措施。",
+                    "key_points": [
+                        "对采集到的温度与震动数据进行实时阈值与趋势分析",
+                        "根据偏差程度划分为预警、告警与紧急三类等级",
+                        "针对不同等级执行调整制冷功率、降低车速或紧急停车检查等动作"
+                    ],
+                    "knowledge_trace": "状态监测 → 异常识别 → 风险分级 → 选择保全策略 → 执行动作并记录反馈。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "status_monitoring", "label": "状态监测(温度/震动)", "type": "input"},
+                            {"id": "anomaly_detection", "label": "异常识别", "type": "process"},
+                            {"id": "risk_assessment", "label": "风险评估", "type": "process"},
+                            {"id": "preservation_strategy", "label": "保全策略选择", "type": "decision"},
+                            {"id": "action_response", "label": "执行响应与记录", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "status_monitoring", "target": "anomaly_detection"},
+                            {"source": "anomaly_detection", "target": "risk_assessment"},
+                            {"source": "risk_assessment", "target": "preservation_strategy"},
+                            {"source": "preservation_strategy", "target": "action_response"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="offroad_convoy_coordination",  # 4. 车队协同
@@ -88,17 +524,89 @@ SCENARIOS: List[Scenario] = [
         example_input="向X位置运输4车食品和水",
         reasoning_chain="行进编队规划（依据道路宽度选择单列或并行队列）→ 协同动作管理（依据道路宽度组织依序掉头或队列整体倒置等动作）",
         prompt=(
-            "【车队协同与效率调度专项要求】\n"
-            "1. 行为树必须包含以下核心节点：\n"
-            "   - task_analysis（任务解析）：解析车队规模、货物类型、目的地等；\n"
-            "   - formation_planning（行进编队规划）：根据道路宽度、地形条件、安全距离，选择单列或并行队列编队方式，"
-            "     确定车辆间距、速度协调策略；\n"
-            "   - coordination_management（协同动作管理）：规划车队协同动作，如依序掉头、队列整体倒置、"
-            "     紧急避让时的队形调整、通过狭窄路段时的顺序安排等，此节点必须包含 knowledge_graph 字段。\n"
-            "2. coordination_management 节点的 knowledge_graph 应体现：\n"
-            "   编队规划(formation_planning) → 动作需求识别(action_requirement) → 协同策略(coordination_strategy) → 执行顺序(execution_sequence) → 状态同步(status_sync)\n"
-            "3. 在 node_insights 中，详细说明编队选择的依据、协同动作的触发条件、执行顺序的规划逻辑。"
+            "【越野物流-车队协同与效率调度专项要求（粒度强化版）】\n"
+            "1. 行为树必须包含：\n"
+            "   - task_analysis（任务解析）：解析车队规模、货物类型、目的地与道路条件；\n"
+            "   - formation_planning（行进编队规划）：根据道路宽度与安全距离选择单列/并行/分段编队方式；\n"
+            "   - coordination_management（协同动作管理，核心决策节点）：规划依序掉头、队列整体倒置、紧急避让等动作，必须包含 knowledge_graph。\n"
+            "2. coordination_management 节点的 knowledge_graph 必须体现：\n"
+            "   编队规划(formation_planning) → 动作需求识别(action_requirement) → 协同策略(coordination_strategy) → 执行顺序(execution_sequence) → 状态同步(status_sync)。\n"
+            "3. node_insights 要求：\n"
+            "   - 对编队选择依据、协同动作触发条件、执行顺序与通信同步机制进行细致说明；\n"
+            "   - knowledge_trace 描述“编队设计 → 动作需求 → 协同策略 → 执行与同步”的完整闭环。"
         ),
+        example_output={
+            "default_focus": "coordination_management",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "🚛 任务解析：向X位置运输4车食品和水",
+                "status": "completed",
+                "summary": "解析车队规模为4车，货物为食品与水，目标为安全高效抵达位置X，并在越野环境下保持队形稳定与协同顺畅。",
+                "children": [
+                    {
+                        "id": "formation_planning",
+                        "label": "行进编队规划",
+                        "status": "completed",
+                        "summary": "根据道路宽度与安全间距选择合适的单列或部分并行队列，确定车序与间距。",
+                        "children": []
+                    },
+                    {
+                        "id": "coordination_management",
+                        "label": "协同动作管理",
+                        "status": "active",
+                        "summary": "针对掉头、超车、避障与通过狭窄路段等场景规划协同动作顺序与通信策略。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务解析",
+                    "summary": "将“向X位置运输4车食品和水”解析为多车协同行进任务，重点关注队形稳定与效率优化。",
+                    "key_points": [
+                        "识别车队规模为4车，货物类型为食品与水",
+                        "结合路况推断是否存在狭窄路段与会车场景",
+                        "提出“既要保障安全距离，又要控制整体用时”的调度目标"
+                    ],
+                    "knowledge_trace": "任务文本解析 → 车队规模与货物属性识别 → 协同与效率目标定义。"
+                },
+                "formation_planning": {
+                    "title": "行进编队规划",
+                    "summary": "根据道路宽度与安全间距要求，确定4车队列采用单列或局部并行的编队方式。",
+                    "key_points": [
+                        "估算道路宽度与会车可能性，判断是否允许并行队列",
+                        "设计前后纵向间距以兼顾制动距离与通信链路稳定性",
+                        "给出初始车序安排，如前车装载较轻、具备更强侦察能力"
+                    ],
+                    "knowledge_trace": "道路与安全约束 → 编队方式筛选 → 车序与间距配置。"
+                },
+                "coordination_management": {
+                    "title": "协同动作管理",
+                    "summary": "为4车队列规划在掉头、避障、通过狭窄路段等典型场景下的协同动作顺序与通信同步方案。",
+                    "key_points": [
+                        "识别需要协同的动作类型：依序掉头、整体倒置、紧急避让等",
+                        "为每种动作制定车辆执行顺序与触发条件",
+                        "通过车间通信实现动作指令与状态的实时同步"
+                    ],
+                    "knowledge_trace": "编队规划结果 → 动作需求识别 → 协同策略制定 → 执行顺序与状态同步设计。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "formation_planning", "label": "编队规划结果", "type": "input"},
+                            {"id": "action_requirement", "label": "动作需求识别", "type": "process"},
+                            {"id": "coordination_strategy", "label": "协同策略设计", "type": "process"},
+                            {"id": "execution_sequence", "label": "执行顺序规划", "type": "decision"},
+                            {"id": "status_sync", "label": "车队状态同步", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "formation_planning", "target": "action_requirement"},
+                            {"source": "action_requirement", "target": "coordination_strategy"},
+                            {"source": "coordination_strategy", "target": "execution_sequence"},
+                            {"source": "execution_sequence", "target": "status_sync"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
 
     # 二、设备投放支援模型测试（5~8）
@@ -117,6 +625,112 @@ SCENARIOS: List[Scenario] = [
             "formation_result（编组结果汇总，包含 knowledge_graph）。\n"
             "2. formation_result 的 knowledge_graph 应体现：任务解析 → 设备匹配 → 数量计算 → 投放方式选择 → 编组方案。"
         ),
+        example_output={
+            "default_focus": "formation_result",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "📦 任务解析：向X前沿阵地投放侦察装置Y",
+                "status": "completed",
+                "summary": "解析侦察装置Y的重量体积、投放精度需求与前沿阵地环境风险，为后续设备匹配与数量推断提供约束条件。",
+                "children": [
+                    {
+                        "id": "equipment_matching",
+                        "label": "设备匹配",
+                        "status": "completed",
+                        "summary": "在可用无人机/无人车中筛选适合携带侦察装置Y并满足投放精度需求的平台。",
+                        "children": []
+                    },
+                    {
+                        "id": "quantity_inference",
+                        "label": "数量推断",
+                        "status": "completed",
+                        "summary": "结合装置Y重量体积与单台平台载荷能力，叠加冗余策略推算所需设备数量。",
+                        "children": []
+                    },
+                    {
+                        "id": "delivery_method",
+                        "label": "投放方式生成",
+                        "status": "completed",
+                        "summary": "根据环境风险与投放精度选取悬停投放或低空抛投等方式。",
+                        "children": []
+                    },
+                    {
+                        "id": "formation_result",
+                        "label": "✅ 编组结果汇总",
+                        "status": "active",
+                        "summary": "形成由多架小型多旋翼无人机构成的投放编组，并明确各自装载份额与投放方式。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务解析",
+                    "summary": "围绕“向X前沿阵地投放侦察装置Y，需要多架无人机协同运输”的描述，抽取物资属性与作战环境约束。",
+                    "key_points": [
+                        "识别侦察装置Y的重量、尺寸与安装接口约束",
+                        "明确前沿阵地对投放位置误差、落点安全区的精度需求",
+                        "分析环境风险，如敌情威胁、高风区、地形遮挡等"
+                    ],
+                    "knowledge_trace": "任务文本 → 物资属性 + 精度 + 环境风险三类要素抽取 → 为设备匹配与数量推断节点提供统一输入。"
+                },
+                "equipment_matching": {
+                    "title": "设备匹配",
+                    "summary": "在候选平台中，选出既能安全携带侦察装置Y，又能达到目标区域的无人机/无人车配置。",
+                    "key_points": [
+                        "比较多旋翼无人机、固定翼无人机与地面无人车的载荷与航程能力",
+                        "考虑起降条件与前沿阵地的地形限制，倾向选择垂直起降平台",
+                        "优先选用具备稳定悬停能力的平台以满足投放精度需求"
+                    ],
+                    "knowledge_trace": "载荷与精度需求 → 平台能力对比 → 选定多旋翼/复合翼等具体机型。"
+                },
+                "quantity_inference": {
+                    "title": "数量推断",
+                    "summary": "依据装置Y重量体积与单机载荷，叠加冗余比例，推算所需无人机数量。",
+                    "key_points": [
+                        "计算单架无人机在安全余量下可携带的装置数量或重量",
+                        "按总任务载荷除以单机有效载荷得到理论最少架数",
+                        "在理论值基础上增加一定比例冗余以应对故障或返航失败"
+                    ],
+                    "knowledge_trace": "物资总载荷建模 → 理论平台数计算 → 冗余策略叠加 → 得到最终编组数量。"
+                },
+                "delivery_method": {
+                    "title": "投放方式生成",
+                    "summary": "在安全与精度约束下，确定装置Y采用悬停投放、低空抛投或着陆放置等方式。",
+                    "key_points": [
+                        "若前沿阵地周边存在敌情威胁，优先选择短停或抛投方式缩短暴露时间",
+                        "对高精度需求任务，倾向选择悬停慢速下放或短暂着陆放置",
+                        "综合风场、地形遮挡等因素，评估各方式对落点偏差的影响"
+                    ],
+                    "knowledge_trace": "环境风险 + 精度要求 → 候选投放方式评估 → 选定最优或组合方案。"
+                },
+                "formation_result": {
+                    "title": "编组结果汇总",
+                    "summary": "将任务解析、设备匹配、数量推断和投放方式四个环节的结论汇总为可执行的编组方案。",
+                    "key_points": [
+                        "明确编组中各无人机的型号、数量与各自装载份额",
+                        "为每台平台绑定具体的投放方式与执行顺序",
+                        "为后续任务流程提供结构化的编组描述，可直接用于调度与可视化"
+                    ],
+                    "knowledge_trace": "任务要素 → 设备匹配 → 数量与方式推断 → 汇总为编组蓝图。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "task_analysis", "label": "任务解析(装置Y, 前沿阵地X)", "type": "input"},
+                            {"id": "equipment_matching", "label": "设备匹配(无人机/无人车)", "type": "process"},
+                            {"id": "quantity_inference", "label": "数量计算(载荷+冗余)", "type": "process"},
+                            {"id": "delivery_method", "label": "投放方式选择", "type": "decision"},
+                            {"id": "formation_plan", "label": "编组方案输出", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "task_analysis", "target": "equipment_matching"},
+                            {"source": "equipment_matching", "target": "quantity_inference"},
+                            {"source": "quantity_inference", "target": "delivery_method"},
+                            {"source": "delivery_method", "target": "formation_plan"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="equipment_precision_location",  # 6. 高精度目标定位
@@ -132,6 +746,93 @@ SCENARIOS: List[Scenario] = [
             "location_result（输出精确坐标，包含 knowledge_graph）。\n"
             "2. location_result 的 knowledge_graph 应体现：环境解析 → 多源融合 → 误差纠正 → 坐标输出。"
         ),
+        example_output={
+            "default_focus": "location_result",
+            "behavior_tree": {
+                "id": "environment_analysis",
+                "label": "🗺️ 环境解析",
+                "status": "completed",
+                "summary": "读取X区域的地图、地物特征与遮挡情况，圈定可能的目标投放区域。",
+                "children": [
+                    {
+                        "id": "sensor_fusion",
+                        "label": "传感器融合定位",
+                        "status": "completed",
+                        "summary": "融合无人机视觉、激光雷达与深度感知数据，对预设标记与地物特征进行联合识别。",
+                        "children": []
+                    },
+                    {
+                        "id": "error_correction",
+                        "label": "误差纠正",
+                        "status": "completed",
+                        "summary": "利用航迹、风场和地面标志物对候选投放点坐标进行偏差修正。",
+                        "children": []
+                    },
+                    {
+                        "id": "location_result",
+                        "label": "✅ 定位结果生成",
+                        "status": "active",
+                        "summary": "输出目标区域的精确坐标，用于后续投放或导航控制模块。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "environment_analysis": {
+                    "title": "环境解析",
+                    "summary": "通过地图与感知数据，识别X区域的关键地物、遮挡物和候选目标区域。",
+                    "key_points": [
+                        "从电子地图中提取道路、建筑物、水体等基础地物特征",
+                        "结合任务预设标记的大致位置缩小搜索范围",
+                        "识别高遮挡区域，为后续传感器视角规划提供参考"
+                    ],
+                    "knowledge_trace": "地图与先验信息 → 地物特征提取 → 候选目标区域圈定。"
+                },
+                "sensor_fusion": {
+                    "title": "传感器融合定位",
+                    "summary": "利用视觉、激光雷达与深度传感器联合识别预设标记，并估算其相对位置。",
+                    "key_points": [
+                        "视觉模块检测地面或建筑表面的预设标记图案",
+                        "激光雷达提供三维点云以刻画空间结构和障碍物",
+                        "深度感知补充距离信息，提升目标位置估计的精度"
+                    ],
+                    "knowledge_trace": "多源数据对齐 → 特征级或决策级融合 → 输出目标的初始空间位置估计。"
+                },
+                "error_correction": {
+                    "title": "误差纠正",
+                    "summary": "结合无人机航迹、风场估计与地面标志物位置，修正初始定位误差。",
+                    "key_points": [
+                        "利用历史航迹和IMU/GNSS数据对定位漂移进行估计",
+                        "将风场对无人机姿态与轨迹的影响纳入误差模型",
+                        "使用已知坐标的地面标志物进行绝对坐标对齐"
+                    ],
+                    "knowledge_trace": "初始定位结果 → 引入航迹与风场模型 → 与地面标志物对齐 → 得到修正后坐标。"
+                },
+                "location_result": {
+                    "title": "定位结果生成",
+                    "summary": "在误差纠正后的基础上，输出可用于后续任务的目标区域精确坐标。",
+                    "key_points": [
+                        "将修正后的目标位置转换为统一坐标系（如WGS84或本地平面坐标）",
+                        "附带定位精度评估指标（如误差椭圆或置信区间）",
+                        "为投放控制或导航系统提供接口友好的数据结构"
+                    ],
+                    "knowledge_trace": "修正后空间位置 → 坐标系转换与精度评估 → 输出标准化定位结果。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "env_analysis", "label": "环境解析", "type": "input"},
+                            {"id": "fusion", "label": "多源传感器融合", "type": "process"},
+                            {"id": "correction", "label": "误差纠正", "type": "process"},
+                            {"id": "coord_output", "label": "坐标输出", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "env_analysis", "target": "fusion"},
+                            {"source": "fusion", "target": "correction"},
+                            {"source": "correction", "target": "coord_output"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="equipment_auto_loading",  # 7. 自主装卸控制
@@ -147,6 +848,93 @@ SCENARIOS: List[Scenario] = [
             "completion_confirmation（确认装卸完成，包含 knowledge_graph）。\n"
             "2. completion_confirmation 的 knowledge_graph 应体现：需求解析 → 动作规划 → 安全检测 → 完成确认。"
         ),
+        example_output={
+            "default_focus": "completion_confirmation",
+            "behavior_tree": {
+                "id": "loading_requirement",
+                "label": "📦 装卸需求解析",
+                "status": "completed",
+                "summary": "解析设备Y的重量、尺寸与抓取特性，明确无人车装卸任务的基本约束。",
+                "children": [
+                    {
+                        "id": "motion_planning",
+                        "label": "动作规划",
+                        "status": "completed",
+                        "summary": "为机械臂生成抓取路径、姿态调整与力控策略。",
+                        "children": []
+                    },
+                    {
+                        "id": "safety_detection",
+                        "label": "安全检测",
+                        "status": "completed",
+                        "summary": "在装卸过程中监测倾倒、滑落与异常力反馈风险。",
+                        "children": []
+                    },
+                    {
+                        "id": "completion_confirmation",
+                        "label": "✅ 装卸完成确认",
+                        "status": "active",
+                        "summary": "综合视觉与传感器数据，确认设备Y已稳定装载/完成卸载。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "loading_requirement": {
+                    "title": "装卸需求解析",
+                    "summary": "将“将设备Y通过无人车运输至X点，并由机械臂自主卸载”的描述转化为对机械臂与载货平台的约束条件。",
+                    "key_points": [
+                        "分析设备Y重量与尺寸，判断是否需要双臂协作或辅助支撑",
+                        "识别设备Y的可抓取区域与禁止接触区域",
+                        "考虑无人车货舱空间与重心位置，确定装卸姿态与目标放置点"
+                    ],
+                    "knowledge_trace": "任务文本解析 → 设备与平台约束抽取 → 形成供动作规划使用的装卸需求配置。"
+                },
+                "motion_planning": {
+                    "title": "动作规划",
+                    "summary": "根据装卸需求，为机械臂生成安全平滑的抓取和放置运动轨迹。",
+                    "key_points": [
+                        "规划从待装载位置到目标货舱位置的关节轨迹，避免碰撞",
+                        "在抓取与放置关键阶段引入力控策略，限制接触力",
+                        "考虑越野车体姿态微小晃动，对轨迹进行必要冗余与缓冲"
+                    ],
+                    "knowledge_trace": "装卸需求 → 碰撞约束与关节限制建模 → 轨迹与力控联合规划。"
+                },
+                "safety_detection": {
+                    "title": "安全检测",
+                    "summary": "在执行装卸动作时实时监测倾倒、滑落与异常力矩等风险。",
+                    "key_points": [
+                        "监控关节力矩与末端力传感器数据，识别异常高负载",
+                        "利用视觉或深度传感器检查设备Y是否有偏移或滑落趋势",
+                        "在检测到高风险时触发暂停或回退动作，保护人员与设备安全"
+                    ],
+                    "knowledge_trace": "在线监测 → 异常阈值判断 → 风险等级评估 → 触发保护策略。"
+                },
+                "completion_confirmation": {
+                    "title": "装卸完成确认",
+                    "summary": "在装载或卸载动作完成后，确认设备Y已稳定定位并处于安全状态。",
+                    "key_points": [
+                        "通过视觉/深度检查设备是否处于预定放置区域和姿态",
+                        "结合力传感器与位置反馈确认设备已脱离机械臂且稳定支撑",
+                        "记录装卸完成状态与关键参数，用于追踪与复盘"
+                    ],
+                    "knowledge_trace": "动作结束 → 姿态与接触状态检查 → 给出“完成/失败/需重试”判定。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "req", "label": "装卸需求解析", "type": "input"},
+                            {"id": "plan", "label": "动作规划", "type": "process"},
+                            {"id": "safety", "label": "安全检测", "type": "process"},
+                            {"id": "confirm", "label": "完成确认", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "req", "target": "plan"},
+                            {"source": "plan", "target": "safety"},
+                            {"source": "safety", "target": "confirm"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="equipment_delivery_confirmation",  # 8. 效效确认 / 投放确认
@@ -162,6 +950,94 @@ SCENARIOS: List[Scenario] = [
             "deployment_judgment（判定成功/失败/需重投，包含 knowledge_graph）。\n"
             "2. deployment_judgment 的 knowledge_graph 应体现：结果感知 → 偏差分析 → 功能检查 → 成功判定。"
         ),
+        example_output={
+            "default_focus": "deployment_judgment",
+            "behavior_tree": {
+                "id": "result_perception",
+                "label": "📷 结果感知",
+                "status": "completed",
+                "summary": "在设备Y投放至X点后，采集图像、姿态与设备回传信号，形成投放结果的第一手信息。",
+                "children": [
+                    {
+                        "id": "deviation_analysis",
+                        "label": "落点偏差分析",
+                        "status": "completed",
+                        "summary": "将设备Y的实际落点坐标与预定坐标进行对比，评估空间偏差。",
+                        "children": []
+                    },
+                    {
+                        "id": "function_check",
+                        "label": "功能状态检查",
+                        "status": "completed",
+                        "summary": "检查设备Y是否正常通电、建立通信链路并处于预期工作模式。",
+                        "children": []
+                    },
+                    {
+                        "id": "deployment_judgment",
+                        "label": "✅ 投放成功判定",
+                        "status": "active",
+                        "summary": "综合落点偏差与功能状态，给出“成功/失败/需重投”的判定结论。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "result_perception": {
+                    "title": "结果感知",
+                    "summary": "通过机载和地面传感器获取设备投放后的图像、姿态与通信状态，建立投放结果的感知基础。",
+                    "key_points": [
+                        "采集覆盖设备周边的全景或多角度图像，观察落点环境",
+                        "利用惯导或姿态传感器估计设备的姿态（是否倾倒、是否稳定）",
+                        "读取设备回传的基础心跳与状态码，确认是否上线"
+                    ],
+                    "knowledge_trace": "图像与姿态采集 → 通信状态读取 → 形成可用于分析的投放结果数据集。"
+                },
+                "deviation_analysis": {
+                    "title": "落点偏差分析",
+                    "summary": "将设备实际落点坐标与任务规划的目标坐标进行对比，评估偏差是否在可接受范围内。",
+                    "key_points": [
+                        "根据图像/传感器数据估计设备在地图坐标中的实际位置",
+                        "计算与目标坐标之间的水平偏差与高度差",
+                        "将偏差与任务容差阈值进行比较，给出“在容差内/超出容差”的结论"
+                    ],
+                    "knowledge_trace": "实际位置反算 → 与目标坐标对比 → 偏差归类与标记。"
+                },
+                "function_check": {
+                    "title": "功能状态检查",
+                    "summary": "检查设备是否正常通电、建立通信链路并在预期模式下运行。",
+                    "key_points": [
+                        "确认设备电源状态与电量水平在安全范围内",
+                        "验证与指挥端或中继节点的通信链路是否建立稳定",
+                        "检查关键功能模块（传感器/计算/通信）是否按预期上电自检通过"
+                    ],
+                    "knowledge_trace": "设备状态采集 → 通信链路与功能模块检查 → 形成“可用/受限/不可用”的功能结论。"
+                },
+                "deployment_judgment": {
+                    "title": "投放成功判定",
+                    "summary": "综合落点偏差结果与功能状态，判断本次投放是否成功，如失败则给出是否需要重投的建议。",
+                    "key_points": [
+                        "若落点在容差范围内且功能完好，则标记为“投放成功”",
+                        "若落点偏差较大或设备功能严重受损，则标记为“投放失败/需重投”",
+                        "在边界情况（轻微偏差或部分功能受限）下，给出“勉强可用/建议补救策略”的说明"
+                    ],
+                    "knowledge_trace": "偏差分析结果 + 功能检查结果 → 规则或经验模型推理 → 输出成功/失败/需重投的判定及理由。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "perception", "label": "结果感知", "type": "input"},
+                            {"id": "deviation", "label": "落点偏差分析", "type": "process"},
+                            {"id": "function", "label": "功能状态检查", "type": "process"},
+                            {"id": "judgment", "label": "投放成功判定", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "perception", "target": "deviation"},
+                            {"source": "perception", "target": "function"},
+                            {"source": "deviation", "target": "judgment"},
+                            {"source": "function", "target": "judgment"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
 
     # 三、伤员救助支援模型测试（9~12）
@@ -180,6 +1056,112 @@ SCENARIOS: List[Scenario] = [
             "team_formation（编组结果，包含 knowledge_graph）。\n"
             "2. team_formation 的 knowledge_graph 应体现：任务解析 → 设备匹配 → 数量计算 → 救援方式 → 编组方案。"
         ),
+        example_output={
+            "default_focus": "team_formation",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "🆘 任务解析：X区域两名伤员救助与转运",
+                "status": "completed",
+                "summary": "解析在X区域发现两名伤员的环境、紧急程度与可达性，为选择救援设备与路径提供约束。",
+                "children": [
+                    {
+                        "id": "equipment_matching",
+                        "label": "设备类型匹配",
+                        "status": "completed",
+                        "summary": "根据地形与伤情选择医疗无人机、担架无人车或救援机器人等组合。",
+                        "children": []
+                    },
+                    {
+                        "id": "quantity_calculation",
+                        "label": "数量计算",
+                        "status": "completed",
+                        "summary": "依据伤员数量、各类设备运载能力与冗余要求推算所需平台数量。",
+                        "children": []
+                    },
+                    {
+                        "id": "rescue_planning",
+                        "label": "救援方式规划",
+                        "status": "completed",
+                        "summary": "综合任务紧急度与地形条件，规划空投急救包、无人机抵近观察和无人车转运的组合方式。",
+                        "children": []
+                    },
+                    {
+                        "id": "team_formation",
+                        "label": "✅ 救助编组结果",
+                        "status": "active",
+                        "summary": "给出由医疗无人机与担架无人车构成的协同救援编组方案。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务解析",
+                    "summary": "将“两名伤员、X区域、需前往救助并运回安全点”的文本拆解为救援规模、时间压力和地形风险等关键要素。",
+                    "key_points": [
+                        "识别伤员数量与可能分布位置，决定是否需要多点同时接入",
+                        "评估X区域地形（山地、废墟、浅水等）对设备通行能力的影响",
+                        "根据“发现伤员”到“必须撤离”的时间窗口评估救助紧急度"
+                    ],
+                    "knowledge_trace": "任务文本解析 → 伤员/地形/时间三类约束建模 → 为设备选择与数量推算提供输入。"
+                },
+                "equipment_matching": {
+                    "title": "设备类型匹配",
+                    "summary": "在医疗无人机、担架无人车与地面机器人中进行组合选择，以覆盖侦察、急救和搬运功能。",
+                    "key_points": [
+                        "为快速抵近和远程观察选配医疗无人机，承担先期侦察与急救包投放",
+                        "为稳定搬运与撤离选配担架无人车，满足承重与地形通过性需求",
+                        "在复杂地形或狭窄空间场景下考虑增配多足救援机器人"
+                    ],
+                    "knowledge_trace": "任务要素 → 功能需求拆解（侦察/急救/搬运） → 匹配具备相应能力的无人平台。"
+                },
+                "quantity_calculation": {
+                    "title": "数量计算",
+                    "summary": "基于每类设备的载荷能力与行动效率，结合冗余策略推算所需设备数量。",
+                    "key_points": [
+                        "按照“两名伤员+可能随身物资”估算搬运需求",
+                        "考虑单台担架车一次只能搬运一名伤员，推导至少需要两次往返或两台设备",
+                        "为防止设备故障或路径被阻断，增加1台冗余平台或预备替代路径"
+                    ],
+                    "knowledge_trace": "伤员与物资载荷建模 → 按设备能力计算理论最小数量 → 加入冗余与调度弹性。"
+                },
+                "rescue_planning": {
+                    "title": "救援方式规划",
+                    "summary": "生成“空投急救包 + 无人机抵近侦察 + 担架无人车转运”的组合救援流程。",
+                    "key_points": [
+                        "先由医疗无人机抵近观察，确认周边环境与伤情，必要时空投急救包",
+                        "随后安排担架无人车沿安全路径接近伤员位置并完成转运",
+                        "在高风险区域预留备选撤离路径或分步中转点"
+                    ],
+                    "knowledge_trace": "任务与设备能力 → 先侦察后搬运的流程设计 → 形成时间与路径均可执行的救援方案。"
+                },
+                "team_formation": {
+                    "title": "救助编组结果",
+                    "summary": "综合前序分析，确定由1~2架医疗无人机与2台担架无人车组成的协同救援编组。",
+                    "key_points": [
+                        "为每台设备分配具体角色，如“前出侦察机”“急救包投放机”“主搬运车”“备用搬运车”",
+                        "给出设备间的到达与撤离先后顺序，避免路线拥堵与冲突",
+                        "形成可直接下发给调度模块的结构化编组描述"
+                    ],
+                    "knowledge_trace": "任务解析 + 设备匹配 + 数量与方式推理 → 汇总为可执行的救援编组蓝图。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "task", "label": "任务解析(两名伤员,X区域)", "type": "input"},
+                            {"id": "equip", "label": "设备匹配(无人机/担架车/机器人)", "type": "process"},
+                            {"id": "qty", "label": "数量计算(载荷+冗余)", "type": "process"},
+                            {"id": "plan", "label": "救援方式规划", "type": "process"},
+                            {"id": "team", "label": "编组方案输出", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "task", "target": "equip"},
+                            {"source": "equip", "target": "qty"},
+                            {"source": "qty", "target": "plan"},
+                            {"source": "plan", "target": "team"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="casualty_remote_triage",  # 10. 远程伤情初步评估与分类
@@ -195,6 +1177,93 @@ SCENARIOS: List[Scenario] = [
             "triage_classification（伤情分类与优先救援级别，包含 knowledge_graph）。\n"
             "2. triage_classification 的 knowledge_graph 应体现：环境风险 → 视觉识别 → 生命体征 → 伤情分类。"
         ),
+        example_output={
+            "default_focus": "triage_classification",
+            "behavior_tree": {
+                "id": "environment_risk",
+                "label": "🌫️ 环境与风险解析",
+                "status": "completed",
+                "summary": "分析X位置周边的烟尘、水流、危险源等远程环境信息，评估接近风险。",
+                "children": [
+                    {
+                        "id": "visual_recognition",
+                        "label": "视觉识别与姿态判断",
+                        "status": "completed",
+                        "summary": "通过无人机图像识别倒地、出血与意识状态等宏观伤情特征。",
+                        "children": []
+                    },
+                    {
+                        "id": "vital_signs_detection",
+                        "label": "生命体征远程检测",
+                        "status": "completed",
+                        "summary": "利用远红外/毫米波对疑似伤员进行呼吸与心率估计。",
+                        "children": []
+                    },
+                    {
+                        "id": "triage_classification",
+                        "label": "✅ 伤情分类与优先级标注",
+                        "status": "active",
+                        "summary": "综合环境风险、视觉特征与生命体征，对疑似伤员进行分级并标注优先救援级别。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "environment_risk": {
+                    "title": "环境与风险解析",
+                    "summary": "基于远程传感器与视频，分析现场是否存在烟尘、高温、水流或次生爆炸等风险。",
+                    "key_points": [
+                        "识别能见度受损区域和浓烟/粉尘分布",
+                        "检测积水、急流或坍塌风险等环境威胁",
+                        "评估是否适合无人平台立即靠近或需要先清除风险"
+                    ],
+                    "knowledge_trace": "环境数据采集 → 危险因子识别 → 形成现场风险等级评估。"
+                },
+                "visual_recognition": {
+                    "title": "视觉识别与姿态判断",
+                    "summary": "通过无人机视频流识别倒地人员、出血迹象与大致意识状态，为初步分级提供线索。",
+                    "key_points": [
+                        "检测人体轮廓与姿态，判断是否倒地不动或有自主活动",
+                        "识别明显出血、血泊或异常体位（如四肢扭曲）",
+                        "结合头部朝向与肢体反应判断可能的意识状态"
+                    ],
+                    "knowledge_trace": "视频帧解析 → 姿态与外观特征提取 → 输出视觉层面的伤情线索。"
+                },
+                "vital_signs_detection": {
+                    "title": "生命体征远程检测",
+                    "summary": "利用远红外成像和毫米波雷达估计疑似伤员的呼吸和心率。",
+                    "key_points": [
+                        "通过远红外检测胸腹部周期性温度变化以估计呼吸频率",
+                        "使用毫米波在胸部区域测量微小位移以估计心率",
+                        "对信号质量进行评估，过滤伪影与噪声"
+                    ],
+                    "knowledge_trace": "传感器数据采集 → 周期信号提取 → 估计呼吸/心率并给出置信度。"
+                },
+                "triage_classification": {
+                    "title": "伤情分类与优先级标注",
+                    "summary": "综合环境风险、视觉线索与生命体征，对疑似伤员进行“轻伤/中度伤/重伤”分类并标注优先救援级别。",
+                    "key_points": [
+                        "若检测到呼吸/心率显著异常或大量出血迹象，则标记为重伤，高优先级",
+                        "若生命体征基本稳定且环境风险较低，可标记为轻伤或中度伤，次级优先",
+                        "在环境风险极高时，即便伤情较重，也需同步考虑救援人员与设备安全"
+                    ],
+                    "knowledge_trace": "环境风险等级 + 视觉与体征线索 → 规则/模型推理 → 输出伤情分级与救援优先队列。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "env", "label": "环境风险", "type": "input"},
+                            {"id": "visual", "label": "视觉伤情线索", "type": "input"},
+                            {"id": "vital", "label": "生命体征估计", "type": "input"},
+                            {"id": "triage", "label": "伤情分级与优先级", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "env", "target": "triage"},
+                            {"source": "visual", "target": "triage"},
+                            {"source": "vital", "target": "triage"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="casualty_near_field_assessment",  # 11. 过程/近程伤情评估
@@ -210,6 +1279,94 @@ SCENARIOS: List[Scenario] = [
             "diagnosis_recommendation（伤情诊断与建议，包含 knowledge_graph）。\n"
             "2. diagnosis_recommendation 的 knowledge_graph 应体现：近距感知 → 重点部位识别 → 精细测量 → 诊断建议。"
         ),
+        example_output={
+            "default_focus": "diagnosis_recommendation",
+            "behavior_tree": {
+                "id": "near_field_sensing",
+                "label": "📹 近距感知初始化",
+                "status": "completed",
+                "summary": "在无人救援车抵近后，启动高清视觉、深度与红外感知，构建伤员近场环境模型。",
+                "children": [
+                    {
+                        "id": "key_area_identification",
+                        "label": "重点部位识别",
+                        "status": "completed",
+                        "summary": "识别出血点、骨折疑似部位以及胸腹部异常区域。",
+                        "children": []
+                    },
+                    {
+                        "id": "precise_vital_signs",
+                        "label": "生命体征精细测量",
+                        "status": "completed",
+                        "summary": "通过专用传感器精确测量血氧、心率、呼吸频率与体温。",
+                        "children": []
+                    },
+                    {
+                        "id": "diagnosis_recommendation",
+                        "label": "✅ 伤情诊断与救治建议",
+                        "status": "active",
+                        "summary": "基于综合评估给出止血、固定、搬运姿势调整等建议。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "near_field_sensing": {
+                    "title": "近距感知初始化",
+                    "summary": "在安全距离内展开传感器，对伤员周边环境与身体表征进行精细扫描。",
+                    "key_points": [
+                        "使用高清相机获取可见光图像，观察皮肤颜色和明显外伤",
+                        "利用深度相机重建三维姿态与周边障碍布局",
+                        "通过红外成像识别局部温度异常区域，如炎症或大出血"
+                    ],
+                    "knowledge_trace": "多模态传感器启动 → 空间与温度场重建 → 为后续重点部位识别提供基础。"
+                },
+                "key_area_identification": {
+                    "title": "重点部位识别",
+                    "summary": "在近场图像与三维模型中自动定位出血点、疑似骨折部位和胸腹部异常。",
+                    "key_points": [
+                        "基于颜色与纹理检测大面积出血或开放性伤口",
+                        "通过肢体形变与非自然角度判断骨折或关节脱位可能",
+                        "分析胸腹部起伏模式与轮廓，对可能的内伤或呼吸异常进行预警"
+                    ],
+                    "knowledge_trace": "图像与3D模型特征提取 → 出血/骨折/胸腹异常多通道检测 → 输出重点关注区域集合。"
+                },
+                "precise_vital_signs": {
+                    "title": "生命体征精细测量",
+                    "summary": "利用贴近式或短距离非接触传感器精确量化血氧、心率、呼吸与体温。",
+                    "key_points": [
+                        "使用指夹或额温/耳温探头获取高精度血氧与体温数据",
+                        "通过心电或胸带式传感器测量心率和心律特征",
+                        "结合胸腹运动与气流传感器统计呼吸频率与通气情况"
+                    ],
+                    "knowledge_trace": "传感器布置与接触 → 体征信号采集与滤波 → 输出标准化生命体征指标。"
+                },
+                "diagnosis_recommendation": {
+                    "title": "伤情诊断与建议",
+                    "summary": "综合重点受伤部位与生命体征信息，形成结构化初步诊断与救治建议。",
+                    "key_points": [
+                        "若存在大出血且血压/心率异常，优先建议止血与液体复苏",
+                        "在疑似骨折情况下，推荐固定方式与搬运姿势以避免二次损伤",
+                        "对于呼吸困难或意识不清等情况，标记为高危并给出快速撤离建议"
+                    ],
+                    "knowledge_trace": "重点部位 + 精细体征 → 规则/模型推理 → 生成可操作的急救与搬运行为建议。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "sense", "label": "近距感知结果", "type": "input"},
+                            {"id": "areas", "label": "重点部位识别", "type": "process"},
+                            {"id": "vitals", "label": "精细生命体征", "type": "process"},
+                            {"id": "diag", "label": "伤情诊断与建议", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "sense", "target": "areas"},
+                            {"source": "sense", "target": "vitals"},
+                            {"source": "areas", "target": "diag"},
+                            {"source": "vitals", "target": "diag"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="casualty_data_sync",  # 12. 伤情数据同步
@@ -225,6 +1382,94 @@ SCENARIOS: List[Scenario] = [
             "sync_confirmation（指挥端数据校验与时间戳比对，包含 knowledge_graph）。\n"
             "2. sync_confirmation 的 knowledge_graph 应体现：数据整理 → 链路选择 → 同步策略 → 确认机制。"
         ),
+        example_output={
+            "default_focus": "sync_confirmation",
+            "behavior_tree": {
+                "id": "data_structure",
+                "label": "🗂️ 数据结构整理",
+                "status": "completed",
+                "summary": "将X伤员的生命体征、伤情分级与地理位置整理为标准化数据结构。",
+                "children": [
+                    {
+                        "id": "communication_selection",
+                        "label": "通信链路选择",
+                        "status": "completed",
+                        "summary": "在点对点、组网中继与卫星链路中选择合适的传输路径组合。",
+                        "children": []
+                    },
+                    {
+                        "id": "sync_strategy",
+                        "label": "数据同步策略",
+                        "status": "completed",
+                        "summary": "根据任务阶段与网络条件，配置周期同步、事件触发与异常加密传输策略。",
+                        "children": []
+                    },
+                    {
+                        "id": "sync_confirmation",
+                        "label": "✅ 同步确认",
+                        "status": "active",
+                        "summary": "在指挥端对接收数据进行校验与时间戳比对，确认为最新有效状态。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "data_structure": {
+                    "title": "数据结构整理",
+                    "summary": "对来自远程与近程评估的多源伤情数据进行清洗与结构化，确保可在多终端间一致理解。",
+                    "key_points": [
+                        "统一生命体征、伤情分级与位置信息的字段命名和单位",
+                        "合并多设备来源的数据，解决时间轴与标识不一致问题",
+                        "为不同优先级信息打标签，支持按需增量同步"
+                    ],
+                    "knowledge_trace": "原始多源数据 → 字段对齐与清洗 → 形成标准化“伤情状态包”。"
+                },
+                "communication_selection": {
+                    "title": "通信链路选择",
+                    "summary": "在多种通信手段中，基于带宽、时延与可靠性要求选择最合适的链路组合。",
+                    "key_points": [
+                        "优先选择低时延高带宽链路，用于实时监控与语音/视频",
+                        "在前线网络不稳定时，启用组网中继或卫星链路作为备份",
+                        "为关键告警信息预留更可靠的链路路径"
+                    ],
+                    "knowledge_trace": "任务通信需求分析 → 候选链路能力评估 → 建立主链路+备链路配置。"
+                },
+                "sync_strategy": {
+                    "title": "数据同步策略",
+                    "summary": "根据任务节奏与网络状况，设计周期同步、事件触发与异常加密传输的组合策略。",
+                    "key_points": [
+                        "为常规状态信息配置较长周期的定时同步以节省带宽",
+                        "对伤情突变或生命体征告警采用事件触发的即时同步",
+                        "在异常或敌情威胁环境下，对敏感数据启用端到端加密与重传机制"
+                    ],
+                    "knowledge_trace": "数据重要性与频率评估 → 映射到周期/事件/异常传输模式 → 生成同步策略配置。"
+                },
+                "sync_confirmation": {
+                    "title": "同步确认",
+                    "summary": "在指挥端对接收的伤情数据进行完整性与时序性校验，确保救援决策基于最新信息。",
+                    "key_points": [
+                        "对比数据包中的时间戳与本地时间，检测延迟与乱序情况",
+                        "使用校验和/签名确认数据在传输过程中未被篡改或丢失",
+                        "当发现数据缺失或过期时，主动向前线节点请求重传或更新"
+                    ],
+                    "knowledge_trace": "接收数据 → 时间戳与完整性校验 → 标记为“最新有效/需更新/无效”并反馈结果。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "data", "label": "标准化伤情数据", "type": "input"},
+                            {"id": "link", "label": "通信链路选择", "type": "process"},
+                            {"id": "strategy", "label": "同步策略配置", "type": "process"},
+                            {"id": "confirm", "label": "同步确认与回执", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "data", "target": "link"},
+                            {"source": "data", "target": "strategy"},
+                            {"source": "link", "target": "confirm"},
+                            {"source": "strategy", "target": "confirm"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
 
     # 四、人员输送支援模型测试（13~16）
@@ -243,6 +1488,113 @@ SCENARIOS: List[Scenario] = [
             "formation_result（编组结果，包含 knowledge_graph）。\n"
             "2. formation_result 的 knowledge_graph 应体现：任务解析 → 车辆匹配 → 数量计算 → 搭载方案 → 编组结果。"
         ),
+        example_output={
+            "default_focus": "formation_result",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "🧍‍♀️🧍‍♂️ 任务解析：向X区域输送8名人员",
+                "status": "completed",
+                "summary": "解析乘员数量、随行物资与路况风险，为车辆选择和搭载方案提供约束。",
+                "children": [
+                    {
+                        "id": "vehicle_matching",
+                        "label": "车辆类型匹配",
+                        "status": "completed",
+                        "summary": "在人员运输无人车与越野运输平台中选择合适的组合。",
+                        "children": []
+                    },
+                    {
+                        "id": "quantity_calculation",
+                        "label": "车辆数量计算",
+                        "status": "completed",
+                        "summary": "根据单车载员能力与随行物资体积推算所需车辆数量并预留冗余。",
+                        "children": []
+                    },
+                    {
+                        "id": "boarding_plan",
+                        "label": "搭载方案规划",
+                        "status": "completed",
+                        "summary": "规划座位分配与随行物资固定位置，兼顾安全与舒适性。",
+                        "children": []
+                    },
+                    {
+                        "id": "formation_result",
+                        "label": "✅ 输送编组结果",
+                        "status": "active",
+                        "summary": "确定若干辆人员运输车的编组与各车的乘员/物资分配方案。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务解析",
+                    "summary": "围绕“向X区域输送8名人员，确保途中安全与舒适性”的目标，提取关键信息。",
+                    "key_points": [
+                        "统计实际乘员数量与角色分布（指挥、保障等）",
+                        "确定随行物资种类与体积，如装备、医疗包、补给品",
+                        "分析路况（山路、非铺装路面、涉水路段）对车辆与舒适性的影响"
+                    ],
+                    "knowledge_trace": "任务文本 → 乘员/物资/路况三类要素抽取 → 形成车辆与编组设计的输入条件。"
+                },
+                "vehicle_matching": {
+                    "title": "车辆类型匹配",
+                    "summary": "根据任务约束选择人员运输无人车或越野平台，必要时组合使用。",
+                    "key_points": [
+                        "若路况平顺且对舒适性要求高，优先选择专用人员运输无人车",
+                        "在复杂地形或越野环境下，引入越野运输平台保证通过性",
+                        "考虑车体悬挂与减振能力以保障乘坐舒适度"
+                    ],
+                    "knowledge_trace": "路况与舒适性需求 → 车辆能力对比 → 选定一类或多类车辆组合。"
+                },
+                "quantity_calculation": {
+                    "title": "车辆数量计算",
+                    "summary": "结合乘员数量、单车载员上限与物资占用空间计算车辆数，并考虑备份。",
+                    "key_points": [
+                        "按单车额定载员数初步计算理论车辆数量",
+                        "为避免超载与保证舒适度，预留适当空座与物资空间",
+                        "根据任务重要性增加1辆冗余车辆或规划二次往返方案"
+                    ],
+                    "knowledge_trace": "乘员与物资需求建模 → 按车辆上限约束求解最小车数 → 加入冗余安全系数。"
+                },
+                "boarding_plan": {
+                    "title": "搭载方案规划",
+                    "summary": "在已确定的车辆数量基础上，规划每辆车的乘员与物资分配。",
+                    "key_points": [
+                        "优先将行动不便或关键岗位人员安排在颠簸较小的位置",
+                        "将重心偏高的物资放置在车体低位并进行固定",
+                        "尽量将同任务小组成员安排在同一车辆或相邻车辆，便于协同"
+                    ],
+                    "knowledge_trace": "车辆编组结果 → 座位与货位资源映射 → 形成安全舒适的搭载方案。"
+                },
+                "formation_result": {
+                    "title": "输送编组结果",
+                    "summary": "输出包括车辆类型、数量、每车乘员与物资分配的完整编组方案。",
+                    "key_points": [
+                        "列出每辆车的车型、编号、负责运送的乘员名单与主要物资",
+                        "说明编组设计中与安全和舒适度相关的关键考虑因素",
+                        "生成可供后续路径规划与监控模块直接使用的结构化描述"
+                    ],
+                    "knowledge_trace": "任务解析 + 车辆匹配 + 数量计算 + 搭载规划 → 汇总为人员输送编组蓝图。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "task", "label": "任务解析(8名乘员,X区域)", "type": "input"},
+                            {"id": "veh", "label": "车辆类型匹配", "type": "process"},
+                            {"id": "qty", "label": "车辆数量计算", "type": "process"},
+                            {"id": "board", "label": "搭载方案规划", "type": "process"},
+                            {"id": "form", "label": "输送编组结果", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "task", "target": "veh"},
+                            {"source": "task", "target": "qty"},
+                            {"source": "veh", "target": "qty"},
+                            {"source": "qty", "target": "board"},
+                            {"source": "board", "target": "form"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="personnel_comfort_routing",  # 14. 舒适性导向路径规划
@@ -258,6 +1610,95 @@ SCENARIOS: List[Scenario] = [
             "dynamic_adjustment（根据实时振动/颠簸感知进行微调，包含 knowledge_graph）。\n"
             "2. dynamic_adjustment 的 knowledge_graph 应体现：路况解析 → 舒适度评估 → 路径优选 → 动态调整。"
         ),
+        example_output={
+            "default_focus": "dynamic_adjustment",
+            "behavior_tree": {
+                "id": "road_condition_analysis",
+                "label": "🛣️ 路况综合解析",
+                "status": "completed",
+                "summary": "分析通往X点的候选路段坡度、崎岖度与障碍密度。",
+                "children": [
+                    {
+                        "id": "comfort_model",
+                        "label": "舒适度模型评估",
+                        "status": "completed",
+                        "summary": "基于振动预测和加速度变化对不同候选路线的舒适度进行量化评估。",
+                        "children": []
+                    },
+                    {
+                        "id": "route_optimization",
+                        "label": "路径优选",
+                        "status": "completed",
+                        "summary": "在满足安全和效率约束的前提下选择起伏小、加减速平顺的路线。",
+                        "children": []
+                    },
+                    {
+                        "id": "dynamic_adjustment",
+                        "label": "✅ 动态舒适性调整",
+                        "status": "active",
+                        "summary": "根据实时振动/颠簸感知对行驶速度与局部路径进行微调。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "road_condition_analysis": {
+                    "title": "路况综合解析",
+                    "summary": "结合高精地图与在线感知信息，识别坡度大、坑洼多和障碍密集的区域。",
+                    "key_points": [
+                        "分析纵坡与横坡变化，检测陡坡和急弯路段",
+                        "基于路面点云与振动历史数据识别颠簸区段",
+                        "标注潜在障碍密集区域，为后续路径规避提供依据"
+                    ],
+                    "knowledge_trace": "地图+感知数据 → 路面特征提取 → 为舒适度评估提供路段标签。"
+                },
+                "comfort_model": {
+                    "title": "舒适度模型评估",
+                    "summary": "根据车辆动力学模型与历史振动数据，对候选路线的舒适度进行预测。",
+                    "key_points": [
+                        "利用车辆悬挂与车速模型预测不同路段的垂向加速度",
+                        "结合乘员对振动频段敏感度构建舒适度评分函数",
+                        "为每条候选路径计算综合舒适度指数"
+                    ],
+                    "knowledge_trace": "路段特征 + 车辆模型 → 振动与加速度预测 → 转化为舒适度评分。"
+                },
+                "route_optimization": {
+                    "title": "路径优选",
+                    "summary": "在安全、时间与舒适度三者之间做权衡，选择综合最优路线。",
+                    "key_points": [
+                        "过滤掉安全风险不可接受的路线",
+                        "在剩余路径中以舒适度为主目标、时间为次目标进行多目标优化",
+                        "可根据任务偏好调整“舒适度优先”或“效率优先”权重"
+                    ],
+                    "knowledge_trace": "候选路径 + 舒适度评分 → 多目标优化 → 选定主行驶路线。"
+                },
+                "dynamic_adjustment": {
+                    "title": "动态舒适性调整",
+                    "summary": "运行过程中利用实时振动/姿态数据对速度和局部路线进行在线微调。",
+                    "key_points": [
+                        "监测车辆纵向与垂向加速度，当超出舒适阈值时自动减速",
+                        "在允许的范围内对车道内横向位置或微小绕行路径做优化",
+                        "记录颠簸热点区域，为后续任务更新路况与舒适度模型"
+                    ],
+                    "knowledge_trace": "实时传感数据 → 与舒适度阈值对比 → 触发速度/路径微调控制指令。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "road", "label": "路况解析结果", "type": "input"},
+                            {"id": "model", "label": "舒适度模型评估", "type": "process"},
+                            {"id": "route", "label": "静态路径优选", "type": "process"},
+                            {"id": "realtime", "label": "实时振动/姿态感知", "type": "input"},
+                            {"id": "adjust", "label": "动态行驶调整", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "road", "target": "model"},
+                            {"source": "model", "target": "route"},
+                            {"source": "route", "target": "adjust"},
+                            {"source": "realtime", "target": "adjust"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="personnel_safety_monitor",  # 15. 人员与环境安全监控
@@ -273,6 +1714,95 @@ SCENARIOS: List[Scenario] = [
             "safety_strategy_update（基于实时风险调整行驶参数，包含 knowledge_graph）。\n"
             "2. safety_strategy_update 的 knowledge_graph 应体现：乘员监控 → 环境风险 → 异常处理 → 策略更新。"
         ),
+        example_output={
+            "default_focus": "safety_strategy_update",
+            "behavior_tree": {
+                "id": "passenger_monitoring",
+                "label": "🧑‍✈️ 乘员状态监控",
+                "status": "completed",
+                "summary": "实时监控安全带系紧情况、乘员姿态与体征波动，识别潜在风险。",
+                "children": [
+                    {
+                        "id": "environment_risk",
+                        "label": "环境风险感知",
+                        "status": "completed",
+                        "summary": "感知落石、积水、滑坡风险与车辆周界异常目标。",
+                        "children": []
+                    },
+                    {
+                        "id": "anomaly_handling",
+                        "label": "异常识别与处理",
+                        "status": "completed",
+                        "summary": "对乘员或环境异常进行识别，并执行减速、避让或停车保护等措施。",
+                        "children": []
+                    },
+                    {
+                        "id": "safety_strategy_update",
+                        "label": "✅ 安全策略更新",
+                        "status": "active",
+                        "summary": "基于实时风险自动调整行驶参数与告警策略。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "passenger_monitoring": {
+                    "title": "乘员状态监控",
+                    "summary": "通过车内摄像头与体征传感器监控乘员是否安全、舒适。",
+                    "key_points": [
+                        "检测安全带是否系好，姿态是否异常（如大幅晃动或跌倒）",
+                        "监测心率、呼吸等体征是否出现应激反应",
+                        "识别乘员中是否有人出现明显不适或急性症状"
+                    ],
+                    "knowledge_trace": "车内感知数据 → 安全与舒适指标计算 → 输出乘员风险等级。"
+                },
+                "environment_risk": {
+                    "title": "环境风险感知",
+                    "summary": "利用雷达、摄像头与环境传感器识别道路与周边风险。",
+                    "key_points": [
+                        "检测前方落石、塌方、积水和泥泞区域",
+                        "识别路侧滑坡、悬崖等高危地形",
+                        "监测车辆周界异常目标，如突然闯入的行人或其他车辆"
+                    ],
+                    "knowledge_trace": "外部感知数据 → 危险目标与地形特征识别 → 形成环境风险地图。"
+                },
+                "anomaly_handling": {
+                    "title": "异常识别与处理",
+                    "summary": "对乘员和环境的综合异常进行识别，并触发相应的应对策略。",
+                    "key_points": [
+                        "若前方存在高风险障碍，则减速、绕行或紧急制动",
+                        "若乘员出现严重不适，可在安全位置停车并上报",
+                        "将关键异常事件记录并回传指挥端以便后续分析"
+                    ],
+                    "knowledge_trace": "乘员风险 + 环境风险 → 异常级别评估 → 选择对应处置动作。"
+                },
+                "safety_strategy_update": {
+                    "title": "安全策略更新",
+                    "summary": "根据实时监测结果动态调整行驶参数与安全策略，以降低整体风险。",
+                    "key_points": [
+                        "在风险较高路段降低最高车速并提高安全距离",
+                        "在乘员状态较差时偏向更平稳的加减速策略",
+                        "在风险解除后逐步恢复常规行驶策略"
+                    ],
+                    "knowledge_trace": "异常处理结果反馈 → 更新速度、加速度与告警阈值 → 持续闭环优化安全策略。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "pax", "label": "乘员状态监控", "type": "input"},
+                            {"id": "env", "label": "环境风险感知", "type": "input"},
+                            {"id": "anom", "label": "异常识别与处置", "type": "process"},
+                            {"id": "policy", "label": "行驶安全策略", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "pax", "target": "anom"},
+                            {"source": "env", "target": "anom"},
+                            {"source": "anom", "target": "policy"},
+                            {"source": "policy", "target": "pax"},
+                            {"source": "policy", "target": "env"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="personnel_multi_destination_dispatch",  # 16. 多目的地协同调度
@@ -288,6 +1818,94 @@ SCENARIOS: List[Scenario] = [
             "multi_vehicle_coordination（车辆分工、同步与交叉任务处理，包含 knowledge_graph）。\n"
             "2. multi_vehicle_coordination 的 knowledge_graph 应体现：任务拆解 → 路径代价 → 顺序规划 → 多车协同。"
         ),
+        example_output={
+            "default_focus": "multi_vehicle_coordination",
+            "behavior_tree": {
+                "id": "task_decomposition",
+                "label": "📍 任务拆解：人员与目的地映射",
+                "status": "completed",
+                "summary": "将人员A/B/C与目的地X/Y/Z建立映射，形成多目的地任务集合。",
+                "children": [
+                    {
+                        "id": "path_cost_calculation",
+                        "label": "路径代价计算",
+                        "status": "completed",
+                        "summary": "计算各人员-目的地组合在不同车辆与路径下的距离、时间与路况代价。",
+                        "children": []
+                    },
+                    {
+                        "id": "stop_sequence_planning",
+                        "label": "停靠顺序规划",
+                        "status": "completed",
+                        "summary": "在整体效率与约束条件下规划各车辆的停靠顺序。",
+                        "children": []
+                    },
+                    {
+                        "id": "multi_vehicle_coordination",
+                        "label": "✅ 多车协同调度",
+                        "status": "active",
+                        "summary": "生成多车之间的任务分工与时间协调方案。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_decomposition": {
+                    "title": "任务拆解",
+                    "summary": "将“一车多点”或“多车多点”的输送任务拆解为若干人员-目的地-时间窗子任务。",
+                    "key_points": [
+                        "为每名乘员记录起点、目的地与必须到达时间等约束",
+                        "识别是否存在必须同行或禁止同行的乘员组合约束",
+                        "将任务转化为适合路径与调度算法求解的结构化实例"
+                    ],
+                    "knowledge_trace": "自然语言任务 → 约束与目标提取 → 人员-目的地-时间窗任务集。"
+                },
+                "path_cost_calculation": {
+                    "title": "路径代价计算",
+                    "summary": "对不同车辆和可能路径，计算服务各子任务的综合代价。",
+                    "key_points": [
+                        "基于路网与路况估算行驶时间与里程",
+                        "考虑坡度、路面情况等对能耗与舒适度的影响",
+                        "构建多维代价函数（时间、距离、风险、舒适度）"
+                    ],
+                    "knowledge_trace": "路网与路况数据 → 单段路径代价 → 聚合得到车辆-任务组合代价矩阵。"
+                },
+                "stop_sequence_planning": {
+                    "title": "停靠顺序规划",
+                    "summary": "为每辆车规划在多个目的地之间的访问顺序，兼顾总时间与乘员体验。",
+                    "key_points": [
+                        "在满足时间窗约束的前提下最小化总行驶时间或里程",
+                        "避免让同一乘员在车上绕行过多无关目的地",
+                        "优先安排紧急或距离较近任务，减少等待时间"
+                    ],
+                    "knowledge_trace": "任务集 + 代价矩阵 → 车辆层面的TSP/VRP求解 → 得到停靠顺序。"
+                },
+                "multi_vehicle_coordination": {
+                    "title": "多车协同调度",
+                    "summary": "在各车辆停靠顺序基础上进行跨车协同，提升整体效率与鲁棒性。",
+                    "key_points": [
+                        "在多辆车之间分配人员与目的地任务，平衡负载与时间",
+                        "预留车辆间的交叉接驳或任务转移方案以应对故障",
+                        "将最终计划转化为每辆车的时空轨迹与任务时间表"
+                    ],
+                    "knowledge_trace": "停靠顺序 + 资源约束 → 协同优化 → 输出多车协同调度方案。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "decomp", "label": "任务拆解结果", "type": "input"},
+                            {"id": "cost", "label": "路径代价矩阵", "type": "process"},
+                            {"id": "seq", "label": "车辆停靠顺序", "type": "process"},
+                            {"id": "coord", "label": "多车协同调度方案", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "decomp", "target": "cost"},
+                            {"source": "cost", "target": "seq"},
+                            {"source": "decomp", "target": "seq"},
+                            {"source": "seq", "target": "coord"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
 
     # 五、资源保障支援模型测试（17~20）
@@ -305,6 +1923,94 @@ SCENARIOS: List[Scenario] = [
             "anomaly_detection（识别资源丢失、库存异常、传感器失联，包含 knowledge_graph）。\n"
             "2. anomaly_detection 的 knowledge_graph 应体现：资源类别 → 追踪方式 → 状态更新 → 异常识别。"
         ),
+        example_output={
+            "default_focus": "anomaly_detection",
+            "behavior_tree": {
+                "id": "resource_category",
+                "label": "📦 资源类别解析",
+                "status": "completed",
+                "summary": "将前线单位使用的物资按弹药、食物、燃料、备件等类别进行结构化建模。",
+                "children": [
+                    {
+                        "id": "tracking_method",
+                        "label": "追踪方式匹配",
+                        "status": "completed",
+                        "summary": "为不同资源类别匹配合适的追踪手段，如RFID、二维码、GPS或无人机盘点。",
+                        "children": []
+                    },
+                    {
+                        "id": "status_update",
+                        "label": "状态更新机制",
+                        "status": "completed",
+                        "summary": "设计位置、数量与消耗速率等状态字段的更新与存储机制。",
+                        "children": []
+                    },
+                    {
+                        "id": "anomaly_detection",
+                        "label": "✅ 异常识别",
+                        "status": "active",
+                        "summary": "发现资源丢失、库存异常或传感器失联等异常情况并上报。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "resource_category": {
+                    "title": "资源类别解析",
+                    "summary": "根据物资类型与用途对资源进行分组，为后续追踪与统计提供统一视图。",
+                    "key_points": [
+                        "将前线单位物资划分为弹药、食物、燃料、备件等主类",
+                        "在每个大类下增加规格、批次与存储位置等子属性",
+                        "为每件资源分配全局唯一标识符，便于跨区域追踪"
+                    ],
+                    "knowledge_trace": "原始物资清单 → 类别与属性抽取 → 形成资源建模字典。"
+                },
+                "tracking_method": {
+                    "title": "追踪方式匹配",
+                    "summary": "结合成本、精度与实时性，为不同类别资源选择合适的追踪技术。",
+                    "key_points": [
+                        "对高价值或关键资源优先配置RFID+GPS等组合追踪手段",
+                        "对大宗低价值物资采用二维码盘点或无人机盘库",
+                        "考虑战场环境对标签与设备可靠性的影响"
+                    ],
+                    "knowledge_trace": "资源类别 + 价值等级 → 追踪技术能力评估 → 选择一对多的标记与采集方案。"
+                },
+                "status_update": {
+                    "title": "状态更新机制",
+                    "summary": "定义资源位置、数量与消耗速率等关键字段的更新流程与触发条件。",
+                    "key_points": [
+                        "基于RFID/二维码扫描或盘点结果更新库存数量与位置",
+                        "根据任务执行记录与加油/补给数据估算消耗速率",
+                        "通过增量更新与时间戳机制保持多节点间状态一致"
+                    ],
+                    "knowledge_trace": "追踪读数 + 任务数据 → 字段级融合与覆盖策略 → 得到最新资源状态表。"
+                },
+                "anomaly_detection": {
+                    "title": "异常识别",
+                    "summary": "比较期望状态与实时状态，识别资源丢失、库存异常和传感器失联。",
+                    "key_points": [
+                        "当账面数量与盘点结果差异超出阈值时标记为库存异常",
+                        "在无任务记录的情况下出现位置剧烈变化时提示可能丢失或误记",
+                        "若追踪设备长时间无上报，判定为传感器失联并建议人工核查"
+                    ],
+                    "knowledge_trace": "期望状态(模型) + 实时状态(追踪) → 差异分析 → 输出异常清单与告警等级。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "cat", "label": "资源类别模型", "type": "input"},
+                            {"id": "track", "label": "追踪方式与读数", "type": "process"},
+                            {"id": "status", "label": "资源状态更新", "type": "process"},
+                            {"id": "anom", "label": "异常识别结果", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "cat", "target": "track"},
+                            {"source": "track", "target": "status"},
+                            {"source": "cat", "target": "status"},
+                            {"source": "status", "target": "anom"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="resource_allocation",  # 18. 需求分配建议
@@ -320,6 +2026,93 @@ SCENARIOS: List[Scenario] = [
             "allocation_plan（生成分配比例与理由，包含 knowledge_graph）。\n"
             "2. allocation_plan 的 knowledge_graph 应体现：需求解析 → 库存计算 → 分配策略 → 方案生成。"
         ),
+        example_output={
+            "default_focus": "allocation_plan",
+            "behavior_tree": {
+                "id": "demand_analysis",
+                "label": "📋 需求解析",
+                "status": "completed",
+                "summary": "解析A、B、C三个小队对急救物资的数量、紧急度与使用场景。",
+                "children": [
+                    {
+                        "id": "inventory_calculation",
+                        "label": "库存与可用量计算",
+                        "status": "completed",
+                        "summary": "统计当前中央与各前线仓的库存与可下发可用量。",
+                        "children": []
+                    },
+                    {
+                        "id": "allocation_strategy",
+                        "label": "分配策略推理",
+                        "status": "completed",
+                        "summary": "综合任务优先级、需求满足度和运输成本，生成分配策略。",
+                        "children": []
+                    },
+                    {
+                        "id": "allocation_plan",
+                        "label": "✅ 分配方案生成",
+                        "status": "active",
+                        "summary": "输出对各小队的分配比例与对应理由。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "demand_analysis": {
+                    "title": "需求解析",
+                    "summary": "将自然语言描述的物资需求转化为结构化的数量、紧急度与应用场景。",
+                    "key_points": [
+                        "识别各小队的当前任务类型（进攻、防御、救援等）",
+                        "根据任务危险度与持续时间评估急救物资紧急度",
+                        "将“不少于”“尽量满足”等模糊表达转化为可计算区间"
+                    ],
+                    "knowledge_trace": "任务描述与请求文本 → 需求字段抽取 → A/B/C小队的结构化需求列表。"
+                },
+                "inventory_calculation": {
+                    "title": "库存与可用量计算",
+                    "summary": "综合中央仓与沿线补给点的库存，计算可在指定时间内下发的有效可用量。",
+                    "key_points": [
+                        "统计各仓库当前库存及在途补给",
+                        "扣除已锁定给其他任务的预分配资源",
+                        "考虑有效期、环境适应性等约束，过滤不可用物资"
+                    ],
+                    "knowledge_trace": "库存数据库 + 任务锁定表 → 可用量计算 → 形成候选可分配资源池。"
+                },
+                "allocation_strategy": {
+                    "title": "分配策略推理",
+                    "summary": "在资源有限的情况下综合任务优先级、需求满足度与运输成本推导分配规则。",
+                    "key_points": [
+                        "根据任务优先级与伤亡风险为各小队分配权重",
+                        "在权重约束下最大化整体需求满足度",
+                        "在多个满足方案中选择运输成本更低的一组"
+                    ],
+                    "knowledge_trace": "需求列表 + 可用量 → 优先级加权优化 → 得到分配比例矩阵。"
+                },
+                "allocation_plan": {
+                    "title": "分配方案生成",
+                    "summary": "将分配结果转化为每个小队的具体物资数量与调配理由，便于指挥决策。",
+                    "key_points": [
+                        "量化列出A/B/C各自获得的物资数量与占总量的比例",
+                        "解释关键决策原因，如“因任务紧急度更高获得更多配额”",
+                        "输出可以被后续补给与调度模块直接读取的结构化结果"
+                    ],
+                    "knowledge_trace": "分配策略 + 可用资源 → 生成面向人/机双向友好的分配清单。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "dem", "label": "多单位需求解析", "type": "input"},
+                            {"id": "inv", "label": "库存与可用量", "type": "input"},
+                            {"id": "strat", "label": "分配策略推理", "type": "process"},
+                            {"id": "plan", "label": "分配方案输出", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "dem", "target": "strat"},
+                            {"source": "inv", "target": "strat"},
+                            {"source": "strat", "target": "plan"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="resource_replenishment_dispatch",  # 19. 补给任务生成与调度
@@ -335,6 +2128,94 @@ SCENARIOS: List[Scenario] = [
             "execution_monitoring（补给确认、状态更新，包含 knowledge_graph）。\n"
             "2. execution_monitoring 的 knowledge_graph 应体现：短缺识别 → 任务构建 → 运输规划 → 执行监控。"
         ),
+        example_output={
+            "default_focus": "execution_monitoring",
+            "behavior_tree": {
+                "id": "shortage_identification",
+                "label": "🚨 短缺资源识别",
+                "status": "completed",
+                "summary": "识别X区域在医疗物资上的异常消耗与低库存预警。",
+                "children": [
+                    {
+                        "id": "replenishment_task",
+                        "label": "补给任务构建",
+                        "status": "completed",
+                        "summary": "根据缺口生成补给物资清单、目标位置与时限要求。",
+                        "children": []
+                    },
+                    {
+                        "id": "transport_planning",
+                        "label": "运输与调度规划",
+                        "status": "completed",
+                        "summary": "为补给任务匹配车辆与路线，并规划补给顺序。",
+                        "children": []
+                    },
+                    {
+                        "id": "execution_monitoring",
+                        "label": "✅ 任务执行检测与回传",
+                        "status": "active",
+                        "summary": "监控补给任务执行情况，完成后更新库存状态。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "shortage_identification": {
+                    "title": "短缺资源识别",
+                    "summary": "通过对消耗速率与库存阈值的持续监控，提前发现X区域的医疗物资短缺。",
+                    "key_points": [
+                        "分析历史消耗曲线，识别异常加速消耗段",
+                        "对比当前库存与安全库存下限，触发低库存预警",
+                        "结合任务计划预测未来一段时间内的缺口规模"
+                    ],
+                    "knowledge_trace": "历史消耗 + 当前库存 + 未来任务 → 短缺预测与告警。"
+                },
+                "replenishment_task": {
+                    "title": "补给任务构建",
+                    "summary": "将缺口信息转化为可执行的补给任务描述。",
+                    "key_points": [
+                        "根据缺口类型与等级生成细化物资清单与数量",
+                        "指定补给目标位置、接收单位与完成时限",
+                        "为任务分配优先级以指导调度资源分配"
+                    ],
+                    "knowledge_trace": "短缺预测结果 → 物资与时间约束 → 标准化补给任务实体。"
+                },
+                "transport_planning": {
+                    "title": "运输与调度规划",
+                    "summary": "为补给任务选择合适车辆、规划路线并排序多个补给点。",
+                    "key_points": [
+                        "根据物资体积与重量匹配合适的运输车辆与数量",
+                        "在安全与效率约束下规划补给路线",
+                        "若存在多个补给点，设计合理的停靠顺序"
+                    ],
+                    "knowledge_trace": "补给任务 + 车队资源 → 多目标路径与调度优化 → 生成运输计划。"
+                },
+                "execution_monitoring": {
+                    "title": "任务执行检测与回传",
+                    "summary": "在补给执行过程中持续跟踪进度并更新资源数据库。",
+                    "key_points": [
+                        "监控车辆位置与状态，判断是否按计划到达各补给点",
+                        "在完成装卸后更新目标单位与源仓库库存",
+                        "异常中断时生成告警并建议改派车辆或调整路线"
+                    ],
+                    "knowledge_trace": "车队执行数据 + 仓储变更记录 → 补给任务完成度评估与库存同步。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "short", "label": "短缺识别结果", "type": "input"},
+                            {"id": "task", "label": "补给任务描述", "type": "process"},
+                            {"id": "plan", "label": "运输与调度规划", "type": "process"},
+                            {"id": "exec", "label": "执行监控与状态回传", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "short", "target": "task"},
+                            {"source": "task", "target": "plan"},
+                            {"source": "plan", "target": "exec"},
+                            {"source": "exec", "target": "short"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
     Scenario(
         id="resource_consumption_forecast",  # 20. 资源消耗预测与规划
@@ -350,6 +2231,94 @@ SCENARIOS: List[Scenario] = [
             "reserve_planning（规划最小库存量、安全冗余、补给周期，包含 knowledge_graph）。\n"
             "2. reserve_planning 的 knowledge_graph 应体现：历史分析 → 环境建模 → 消耗预测 → 储备规划。"
         ),
+        example_output={
+            "default_focus": "reserve_planning",
+            "behavior_tree": {
+                "id": "historical_analysis",
+                "label": "📈 历史数据分析",
+                "status": "completed",
+                "summary": "分析X作业区历史燃料消耗模式与任务类型分布。",
+                "children": [
+                    {
+                        "id": "modeling",
+                        "label": "环境与任务强度建模",
+                        "status": "completed",
+                        "summary": "建模未来72小时内的温度、地形与操作负载等影响因素。",
+                        "children": []
+                    },
+                    {
+                        "id": "consumption_forecast",
+                        "label": "消耗量预测",
+                        "status": "completed",
+                        "summary": "生成短期/中期燃料消耗预测曲线。",
+                        "children": []
+                    },
+                    {
+                        "id": "reserve_planning",
+                        "label": "✅ 储备规划与建议",
+                        "status": "active",
+                        "summary": "给出最小库存量、安全冗余与补给周期建议。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "historical_analysis": {
+                    "title": "历史数据分析",
+                    "summary": "基于历史记录识别X作业区燃料消耗与任务强度之间的关系。",
+                    "key_points": [
+                        "统计不同任务类型下单位时间燃料消耗水平",
+                        "识别昼夜、季节或气候变化带来的消耗模式差异",
+                        "发现极端任务或异常用油行为对整体曲线的影响"
+                    ],
+                    "knowledge_trace": "历史任务+用油数据 → 任务/时间/环境维度聚合 → 得到多场景消耗基线。"
+                },
+                "modeling": {
+                    "title": "环境与任务强度建模",
+                    "summary": "根据未来72小时的任务计划与环境预报构建消耗影响因子模型。",
+                    "key_points": [
+                        "引入温度、地形坡度、路况等环境变量",
+                        "根据排班与任务计划推估车辆与设备启用强度",
+                        "将上述因素映射为燃料消耗系数的动态调整因子"
+                    ],
+                    "knowledge_trace": "环境预报 + 任务计划 → 强度与环境因子 → 影响系数模型。"
+                },
+                "consumption_forecast": {
+                    "title": "消耗量预测",
+                    "summary": "在历史基线与未来因子模型的基础上，生成未来72小时燃料消耗预测。",
+                    "key_points": [
+                        "对不同时间段分别计算期望消耗区间与置信度",
+                        "识别可能出现高峰消耗的时间窗口",
+                        "提供多种情景（乐观/基线/保守）下的预测曲线"
+                    ],
+                    "knowledge_trace": "历史基线 + 影响系数 → 时间序列预测 → 形成多情景消耗曲线。"
+                },
+                "reserve_planning": {
+                    "title": "储备规划与建议",
+                    "summary": "基于预测结果规划最小库存、安全冗余与补给节奏。",
+                    "key_points": [
+                        "确定在任何时间点下不低于的最小安全库存量",
+                        "按高峰消耗与补给不确定性设计冗余比例",
+                        "给出补给批次与时间间隔建议，平衡仓储成本与安全性"
+                    ],
+                    "knowledge_trace": "消耗预测曲线 + 补给能力与风险偏好 → 库存与补给策略优化。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "hist", "label": "历史消耗分析", "type": "input"},
+                            {"id": "env_model", "label": "环境与任务模型", "type": "process"},
+                            {"id": "forecast", "label": "未来消耗预测", "type": "process"},
+                            {"id": "reserve", "label": "库存与补给规划", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "hist", "target": "env_model"},
+                            {"source": "env_model", "target": "forecast"},
+                            {"source": "hist", "target": "forecast"},
+                            {"source": "forecast", "target": "reserve"}
+                        ]
+                    }
+                }
+            }
+        },
     ),
 ]
 
