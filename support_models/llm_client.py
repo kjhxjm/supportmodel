@@ -79,28 +79,33 @@ def _build_prompt(
         "对于代表“具体方案/决策”的关键节点（例如资源匹配、编队方案、执行方案等），"
         "请至少为 1-3 个此类节点补充结构化的 knowledge_graph 字段，用于展示该节点的推理知识图谱分析；\n"
         "这些 knowledge_graph.nodes[*].label 也必须是中文，能够清晰体现从任务解析 → 方案设计 → 结果输出的推理链条。\n"
-        "注意：前端会通过节点 id 单独请求某一节点的洞察信息，因此请将每个知识图谱严格绑定到对应的方案节点 id 上，"
-        "以便选中该节点时可以直接展示其知识图谱。\n"
+        "注意：前端会通过节点 id 单独请求某一节点的洞察信息，因此请将每个知识图谱严格绑定到对应的方案节点 id 上"
     )
 
-    # 按支援模型细化提示词 —— 越野物流：尽量对齐本地蓝图的推理链条与粒度
+    # 优先使用匹配到的 scenario 的专项提示词，如果没有则使用通用模型提示词
     extra_model_hint = ""
-    if model_name == "越野物流":
-        extra_model_hint = (
-            "\n【越野物流专项要求】\n"
-            "1. 行为树结构建议包含如下关键节点，并保持清晰的层级关系：\n"
-            "   - task_analysis：任务分析与规划（解析目的地、货物、时间限制、道路条件等要素）；\n"
-            "   - route_analysis：路线风险评估（根据泥泞、碎石、损毁等路况分析风险）；\n"
-            "   - terrain_scan / risk_assessment：作为 route_analysis 的子节点，分别刻画“地形扫描”和“风险评估”；\n"
-            "   - fleet_formation：车队编成推理结果（包含knowledge_graph字段，包含车辆类型、数量、装载方案等最终决策）；\n"
-            "   - vehicle_selection / quantity_calculation / loading_plan：作为 fleet_formation 的子节点，分别说明车辆选择、数量计算和装载方案；\n"
-            "   - execution_plan / route_optimization / schedule_arrangement：用于描述执行方案、路线优化和调度安排。\n"
-            "2. 在 node_insights 中，请参考上述节点含义，为每个节点写 summary、3 条左右 key_points，以及一段连贯的 knowledge_trace"
-            "   体现“任务解析 → 路线分析 → 车辆/数量/装载推理 → 执行方案输出”的链条。\n"
-            "3. 至少为以下节点补充结构化 knowledge_graph字段：fleet_formation、resource_match。\n"
-            "   例如 fleet_formation 的知识图谱可以包含如下因果链路：\n"
-            "   任务解析(task_parsing) → 车辆匹配(vehicle_matching) → 数量计算(quantity_calc) → 装载方案(loading_scheme) → 最终配置(fleet_config)。\n"
-        )
+    
+    if scenario is not None and scenario.prompt:
+        # 使用匹配到的 scenario 的专项提示词（最精准）
+        extra_model_hint = f"\n{scenario.prompt}\n"
+    else:
+        # 如果没有 scenario 或 scenario 没有 prompt，则使用通用模型提示词
+        if model_name == "越野物流":
+            extra_model_hint = (
+                "\n【越野物流通用要求】\n"
+                "1. 行为树结构建议包含如下关键节点，并保持清晰的层级关系：\n"
+                "   - task_analysis：任务分析与规划（解析目的地、货物、时间限制、道路条件等要素）；\n"
+                "   - route_analysis：路线风险评估（根据泥泞、碎石、损毁等路况分析风险）；\n"
+                "   - terrain_scan / risk_assessment：作为 route_analysis 的子节点，分别刻画`地形扫描`和`风险评估`；\n"
+                "   - fleet_formation：车队编成推理结果（包含knowledge_graph字段，包含车辆类型、数量、装载方案等最终决策）；\n"
+                "   - vehicle_selection / quantity_calculation / loading_plan：作为 fleet_formation 的子节点，分别说明车辆选择、数量计算和装载方案；\n"
+                "   - execution_plan / route_optimization / schedule_arrangement：用于描述执行方案、路线优化和调度安排。\n"
+                "2. 在 node_insights 中，请参考上述节点含义，为每个节点写 summary、3 条左右 key_points，以及一段连贯的 knowledge_trace，"
+                "   体现 任务解析 → 路线分析 → 车辆/数量/装载推理 → 执行方案输出的链条。\n"
+                "3. 至少为以下节点补充结构化 knowledge_graph字段：fleet_formation、resource_match。\n"
+                "   例如 fleet_formation 的知识图谱可以包含如下因果链路：\n"
+                "   任务解析(task_parsing) → 车辆匹配(vehicle_matching) → 数量计算(quantity_calc) → 装载方案(loading_scheme) → 最终配置(fleet_config)。\n"
+            )
 
     system_content = base_system_content + extra_model_hint
 

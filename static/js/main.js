@@ -11,7 +11,26 @@ let insightGraphObj = null; // 右侧知识图谱G6实例
 
 document.addEventListener('DOMContentLoaded', () => {
     initializeControls();
-    updateDisplay();
+    
+    // 检查URL参数，如果有input参数则自动填充并触发推理
+    const urlParams = new URLSearchParams(window.location.search);
+    const inputParam = urlParams.get('input');
+    
+    if (inputParam) {
+        const taskInput = document.getElementById('taskInput');
+        if (taskInput) {
+            // 解码URL参数（处理URL编码）
+            const decodedInput = decodeURIComponent(inputParam);
+            taskInput.value = decodedInput;
+            // 自动触发推理
+            currentState.task_description = decodedInput.trim();
+            updateStatus(true);
+            updateDisplay();
+        }
+    } else {
+        // 没有URL参数时，正常更新显示
+        updateDisplay();
+    }
 });
 
 function initializeControls() {
