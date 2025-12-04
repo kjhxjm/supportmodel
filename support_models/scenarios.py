@@ -21,7 +21,7 @@ class Scenario:
 
 # 表1的 20 条测试项目 one-shot 场景。
 SCENARIOS: List[Scenario] = [
-    # 一、越野物流支援模型测试（1~4）
+    # 一、越野物流支援模型测试（1~6）
     Scenario(
         id="offroad_fleet_formation",  # 1. 任务编组
         model_name="越野物流",
@@ -318,14 +318,28 @@ SCENARIOS: List[Scenario] = [
                         "label": "异常感知与处理",
                         "status": "active",
                         "summary": "在执行过程中实时监控道路受损、障碍物与天气变化，必要时派遣无人机/机器狗抵近观察并回传细节。",
-                        "children": []
+                        "children": [],
+                        "control_meta": {
+                            "control_type": "decentralized_rl",
+                            "agent_scope": ["convoy_vehicles", "uav_units", "ugv_dog_units"],
+                            "policy_id": "offroad_anomaly_probe_pi",
+                            "algo_family": "DTDE_consistency_AC",
+                            "training_scenario": "offroad_dynamic_routing"
+                        }
                     },
                     {
                         "id": "route_replanning",
                         "label": "路径重规划",
                         "status": "pending",
                         "summary": "融合初始路径、异常感知结果与车队状态，对原路径进行调整或重新规划生成新路径。",
-                        "children": []
+                        "children": [],
+                        "control_meta": {
+                            "control_type": "decentralized_rl",
+                            "agent_scope": ["convoy_vehicles"],
+                            "policy_id": "offroad_route_replanning_pi",
+                            "algo_family": "DTDE_consistency_AC",
+                            "training_scenario": "offroad_dynamic_routing"
+                        }
                     }
                 ]
             },
@@ -378,7 +392,7 @@ SCENARIOS: List[Scenario] = [
                         "当检测到严重受损或阻断迹象时，发起无人机/机器狗抵近侦察",
                         "将实测路况与原始地图对比，更新路段通行状态"
                     ],
-                    "knowledge_trace": "在线监控 → 异常触发 → 抵近观察 → 通行状态更新并通知重规划模块。"
+                    "knowledge_trace": "在线监控 → 异常触发 → 抵近观察 → 通行状态更新并通知重规划模块；关键探查与机动动作由去中心化RL策略 offroad_anomaly_probe_pi 在车队与无人机/机器狗智能体上本地生成。"
                 },
                 "route_replanning": {
                     "title": "路径重规划",
@@ -388,7 +402,7 @@ SCENARIOS: List[Scenario] = [
                         "在更新后的路网中重新执行路径搜索与评估",
                         "比较新路径与原路径的时间与风险差异，形成调整建议"
                     ],
-                    "knowledge_trace": "路网状态更新 → 新路径搜索与评估 → 新旧路径对比 → 输出重规划结果并同步给执行控制。",
+                    "knowledge_trace": "路网状态更新 → 新路径搜索与评估 → 新旧路径对比 → 输出重规划结果并同步给执行控制；新路径及对应速度/机动方案由去中心化RL策略 offroad_route_replanning_pi 在各车队车辆智能体上分布式计算。",
                     "knowledge_graph": {
                         "nodes": [
                             {"id": "initial_route", "label": "初始路径", "type": "input"},
@@ -555,7 +569,14 @@ SCENARIOS: List[Scenario] = [
                         "label": "协同动作管理",
                         "status": "active",
                         "summary": "针对掉头、超车、避障与通过狭窄路段等场景规划协同动作顺序与通信策略。",
-                        "children": []
+                        "children": [],
+                        "control_meta": {
+                            "control_type": "decentralized_rl",
+                            "agent_scope": ["vehicle_1", "vehicle_2", "vehicle_3", "vehicle_4"],
+                            "policy_id": "convoy_coordination_pi",
+                            "algo_family": "DTDE_consistency_AC",
+                            "training_scenario": "offroad_convoy_coordination"
+                        }
                     }
                 ]
             },
@@ -615,8 +636,271 @@ SCENARIOS: List[Scenario] = [
             }
         },
     ),
+    Scenario(
+        id="offroad_terrain_passability",  # 5. 复杂地形通行能力评估
+        model_name="越野物流",
+        name="复杂地形通行能力评估",
+        example_input="需穿越泥泞与部分坍塌区域，将物资送至前线A点。",
+        reasoning_chain="地形与障碍抽取（泥泞、坍塌、湿滑坡地）→ 通行风险判定（低速通过/需绕行）→ 车辆能力匹配（四驱越野车、履带式无人车）→ 策略生成（加设无人机侦察、选择坡度最小路径、通过速度限制）",
+        prompt=(
+            "【越野物流-复杂地形通行能力评估专项要求】\n"
+            "1. 行为树必须至少包含以下核心节点：\n"
+            "   - task_analysis（任务解析）：\n"
+            "       * 从任务文本中抽取目的地、载荷、时间要求以及地形描述（山地、丘陵、泥泞、断路等）；\n"
+            "   - terrain_obstacle_extraction（地形与障碍抽取）：\n"
+            "       * 细化提取泥泞、坍塌、湿滑坡地、狭窄通道等要素，可拆为地形分类与障碍标注两个子层级；\n"
+            "   - passability_risk_assessment（通行风险判定）：\n"
+            "       * 根据坡度、附着系数、障碍密度等指标评估“可直接通过/需减速通过/需绕行/禁止通行”级别；\n"
+            "   - vehicle_capability_matching（车辆能力匹配）：\n"
+            "       * 在四驱越野车、履带式无人车等候选平台中匹配满足通过能力与安全冗余的配置；\n"
+            "   - passability_strategy（通行策略生成，核心决策节点）：\n"
+            "       * 综合前述信息生成通过或规避策略，必须包含 knowledge_graph 字段。\n"
+            "2. passability_strategy 节点的 knowledge_graph 必须体现：\n"
+            "   地形与障碍抽取(terrain_obstacle) → 通行风险判定(risk_level) → 车辆能力匹配(vehicle_capability) → 策略生成(pass_strategy) → 任务可行性结论(feasibility_conclusion)。\n"
+            "3. 在 node_insights 中：\n"
+            "   - 对各类典型地形（泥泞、坍塌、陡坡、碎石）给出通行判定依据；\n"
+            "   - 说明为何选择四驱越野车或履带式无人车，以及在不同风险级别下的速度限制、侦察需求与绕行条件；\n"
+            "   - knowledge_trace 需完整描绘“任务解析 → 地形/障碍建模 → 风险打分 → 车辆能力对比 → 通行/绕行策略输出”的推理路径。"
+        ),
+        example_output={
+            "default_focus": "passability_strategy",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "🚛 任务解析：穿越泥泞与坍塌区域，补给前线A点",
+                "status": "completed",
+                "summary": "解析任务文本“需穿越泥泞与部分坍塌区域，将物资送至前线A点”，抽取目的地、物资类型、地形风险与大致时效要求，为通行评估提供上下文。",
+                "children": [
+                    {
+                        "id": "terrain_obstacle_extraction",
+                        "label": "地形与障碍抽取",
+                        "status": "completed",
+                        "summary": "从任务描述与先验地图中识别泥泞地段、局部坍塌、湿滑坡地与狭窄通道等关键障碍。",
+                        "children": []
+                    },
+                    {
+                        "id": "passability_risk_assessment",
+                        "label": "通行风险判定",
+                        "status": "completed",
+                        "summary": "基于坡度、附着系数与障碍密度，对各路段进行通行等级与风险系数评估。",
+                        "children": []
+                    },
+                    {
+                        "id": "vehicle_capability_matching",
+                        "label": "车辆能力匹配",
+                        "status": "completed",
+                        "summary": "在四驱越野轮式平台与履带式无人车等候选中，匹配满足通过能力与安全冗余的车辆方案。",
+                        "children": []
+                    },
+                    {
+                        "id": "passability_strategy",
+                        "label": "✅ 通行策略生成与可行性结论",
+                        "status": "active",
+                        "summary": "综合地形障碍、风险等级与车辆能力，给出穿越/绕行策略、速度限制与侦察配置，并形成整体可行性结论。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务解析",
+                    "summary": "围绕“需穿越泥泞与部分坍塌区域，将物资送至前线A点”的描述，提炼任务目标与地形风险。",
+                    "key_points": [
+                        "识别目的地为前线A点，任务性质为补给运输",
+                        "从描述中抽取“泥泞”“部分坍塌”等地形风险关键词",
+                        "推断对安全性与稳定性的要求高于速度需求"
+                    ],
+                    "knowledge_trace": "任务文本解析 → 目的地/任务类型抽取 → 地形风险要素识别 → 为后续地形与风险评估提供输入。"
+                },
+                "terrain_obstacle_extraction": {
+                    "title": "地形与障碍抽取",
+                    "summary": "结合地图、侦察信息与任务文本，将泥泞区、坍塌段、湿滑坡地等转化为结构化障碍信息。",
+                    "key_points": [
+                        "从自然语言描述和地理数据中识别泥泞、坍塌、陡坡等标签",
+                        "估计各障碍段的长度、宽度与分布位置",
+                        "为每类障碍关联典型物理特性（附着系数、承载力等）"
+                    ],
+                    "knowledge_trace": "任务与地图数据 → 障碍特征提取与分类 → 形成可用于评分的地形/障碍集合。"
+                },
+                "passability_risk_assessment": {
+                    "title": "通行风险判定",
+                    "summary": "基于坡度、附着系数和障碍密度，对每个路段给出通行等级与风险系数。",
+                    "key_points": [
+                        "对坡度大、承载力低的路段标记为“高风险或禁止通行”",
+                        "对中等风险路段建议采取减速或单车分步通过策略",
+                        "为每个路段计算通行成功率与陷车/侧翻概率"
+                    ],
+                    "knowledge_trace": "地形/障碍集合 → 指标量化与打分 → 输出通行等级与风险系数。"
+                },
+                "vehicle_capability_matching": {
+                    "title": "车辆能力匹配",
+                    "summary": "将各候选车辆的越野能力与地形风险相匹配，筛选出可通过或可在策略辅助下通过的配置。",
+                    "key_points": [
+                        "对比四驱轮式与履带式平台的通过高度、附着系数容忍度与抗陷车能力",
+                        "结合车辆自重、载荷与底盘高度评估通过坍塌边缘与泥泞段的安全裕度",
+                        "在必要时建议配置救援/拖拽能力作为冗余保障"
+                    ],
+                    "knowledge_trace": "车辆能力参数表 → 与路段风险指标对齐 → 输出适配车辆组合及其安全裕度说明。"
+                },
+                "passability_strategy": {
+                    "title": "通行策略生成",
+                    "summary": "在匹配好的车辆与风险评估结果基础上，生成包含通过/绕行选择、速度限制与侦察配置的综合策略。",
+                    "key_points": [
+                        "对可控风险路段给出限速通过与车距控制建议",
+                        "对高风险或未知路段配置无人机/机器人先行侦察并评估是否绕行",
+                        "形成整体路径通行可行性结论，并标注关键危险点与应急预案"
+                    ],
+                    "knowledge_trace": "风险等级 + 车辆能力 → 路段级策略（通过/减速/绕行） → 汇总为全程通行方案与任务可行性结论。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "terrain_obstacle", "label": "地形与障碍抽取结果", "type": "input"},
+                            {"id": "risk_level", "label": "通行风险判定(等级+系数)", "type": "process"},
+                            {"id": "vehicle_capability", "label": "车辆能力匹配", "type": "process"},
+                            {"id": "pass_strategy", "label": "通行/绕行策略生成", "type": "decision"},
+                            {"id": "feasibility_conclusion", "label": "任务可行性结论", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "terrain_obstacle", "target": "risk_level"},
+                            {"source": "risk_level", "target": "vehicle_capability"},
+                            {"source": "vehicle_capability", "target": "pass_strategy"},
+                            {"source": "pass_strategy", "target": "feasibility_conclusion"}
+                        ]
+                    }
+                }
+            }
+        },
+    ),
+    Scenario(
+        id="offroad_time_energy_estimation",  # 6. 任务耗时与能耗预测
+        model_name="越野物流",
+        name="任务耗时与能耗预测",
+        example_input="运输 400kg 物资至 12km 外的山区前线，道路泥泞且有连续上下坡。",
+        reasoning_chain="载重与坡度解析 → 单位距离能耗估计 → 任务总行程预测 → 能耗模型推理（考虑低温、湿滑导致能耗增加）→ 输出总耗时预测与补能需求（如需中途更换电池或安排补给车辆）",
+        prompt=(
+            "【越野物流-任务耗时与能耗预测专项要求】\n"
+            "1. 行为树必须至少包含以下核心节点：\n"
+            "   - task_analysis（任务解析）：解析运输距离、载重400kg、道路泥泞与连续上下坡、温度等环境因素；\n"
+            "   - load_slope_analysis（载重与坡度解析）：将载重、坡度分布与路面附着条件转化为分段阻力与能耗因子；\n"
+            "   - unit_energy_estimation（单位距离能耗估计）：基于车辆动力学模型与经验参数估算不同路段的单位距离能耗；\n"
+            "   - mission_profile_estimation（任务总行程预测）：综合有效速度、停靠/减速段与坡度影响，预测总行程时间；\n"
+            "   - energy_time_inference（能耗与耗时推理，核心决策节点）：\n"
+            "       * 综合载重、坡度、温度和路况对能耗的影响，给出总能耗与耗时预测，并生成补能/补给建议，必须包含 knowledge_graph 字段。\n"
+            "2. energy_time_inference 节点的 knowledge_graph 必须体现：\n"
+            "   载重与坡度解析(load_slope_profile) → 单位距离能耗(unit_energy) → 行程时间预测(travel_time) → 总能耗推理(total_energy) → 补能与补给建议(resupply_plan)。\n"
+            "3. 在 node_insights 中：\n"
+            "   - 说明如何根据坡度、泥泞程度与温度对单位能耗进行修正；\n"
+            "   - 给出电池容量或油箱容量与预测总能耗之间的对比，并推导是否需要中途补能或补给车辆；\n"
+            "   - knowledge_trace 体现“任务与环境解析 → 分段能耗与速度估计 → 累积行程与总能耗 → 补能/补给策略生成”的完整链路。"
+        ),
+        example_output={
+            "default_focus": "energy_time_inference",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "🚛 任务解析：400kg 越野运输至12km 山区前线",
+                "status": "completed",
+                "summary": "解析“运输 400kg 物资至 12km 外的山区前线，道路泥泞且有连续上下坡”任务，明确载重、距离、路况与环境因素。",
+                "children": [
+                    {
+                        "id": "load_slope_analysis",
+                        "label": "载重与坡度解析",
+                        "status": "completed",
+                        "summary": "将400kg载重与12km路线的坡度分布、泥泞程度转化为分段阻力与附加能耗因子。",
+                        "children": []
+                    },
+                    {
+                        "id": "unit_energy_estimation",
+                        "label": "单位距离能耗估计",
+                        "status": "completed",
+                        "summary": "基于车辆动力学与经验模型，估算在不同坡度与路况下的单位距离能耗。",
+                        "children": []
+                    },
+                    {
+                        "id": "mission_profile_estimation",
+                        "label": "任务总行程预测",
+                        "status": "completed",
+                        "summary": "综合可行平均速度、减速路段与坡度影响，预测总行程时间与速度剖面。",
+                        "children": []
+                    },
+                    {
+                        "id": "energy_time_inference",
+                        "label": "✅ 能耗与耗时推理与补能建议",
+                        "status": "active",
+                        "summary": "在分段能耗与时间预测基础上，给出任务总能耗与总耗时，并生成是否需要中途补能或补给车辆的建议。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务解析",
+                    "summary": "从任务文本中提取运输距离12km、载重400kg以及“泥泞”“连续上下坡”等关键约束。",
+                    "key_points": [
+                        "识别任务为中等距离的山区越野补给任务",
+                        "将“泥泞”和“连续上下坡”转化为滚动阻力与爬坡阻力增加的因素",
+                        "推断任务对能耗与时间的不确定性较大，需要保守估计与冗余"
+                    ],
+                    "knowledge_trace": "任务文本 → 距离/载重/路况要素提取 → 为后续能耗与耗时建模提供输入。"
+                },
+                "load_slope_analysis": {
+                    "title": "载重与坡度解析",
+                    "summary": "根据线路高度剖面与路面状况，将12km路线划分为若干坡度区间，并结合400kg载重计算分段阻力。",
+                    "key_points": [
+                        "基于地形数据得到爬坡、下坡和平路区段的比例与平均坡度",
+                        "在泥泞路段上设置更高的滚动阻力与打滑损耗系数",
+                        "将载重与坡度共同映射为每个区段的牵引力和能耗需求因子"
+                    ],
+                    "knowledge_trace": "高度剖面 + 路况标签 → 分段坡度与路面模型 → 输出 load_slope_profile。"
+                },
+                "unit_energy_estimation": {
+                    "title": "单位距离能耗估计",
+                    "summary": "结合车辆动力系统效率、载重与环境温度，对不同区段的单位距离能耗进行估算。",
+                    "key_points": [
+                        "根据车辆参数设定基准单位能耗（如kWh/km或L/km）",
+                        "在上坡与泥泞区段叠加额外能耗系数，在下坡利用能量回收或滑行降低净能耗",
+                        "考虑低温导致电池效率下降或油耗增加，对整体单位能耗进行修正"
+                    ],
+                    "knowledge_trace": "基准能耗模型 → 按区段叠加坡度/路况/温度修正 → 得到 unit_energy 曲线。"
+                },
+                "mission_profile_estimation": {
+                    "title": "任务总行程预测",
+                    "summary": "在速度、安全与路况约束下，预测整个12km任务的行驶时间。",
+                    "key_points": [
+                        "为平缓路段设定较高巡航速度，为泥泞与陡坡路段设定限速",
+                        "在关键转弯、上坡前后与危险点附近加入减速与加速时间",
+                        "累加各区段行驶时间与可能的短暂停靠时间，得到总耗时区间"
+                    ],
+                    "knowledge_trace": "速度与安全策略 → 区段行驶时间计算 → 累加得到 total_travel_time。"
+                },
+                "energy_time_inference": {
+                    "title": "能耗与耗时推理与补能建议",
+                    "summary": "综合分段能耗与总行程时间，推导任务总能耗与耗时，并对电池/燃料余量与补能策略给出建议。",
+                    "key_points": [
+                        "将 unit_energy 与分段距离相乘并累加，得到任务总能耗估计",
+                        "将总能耗与车辆电池容量或油箱容量对比，评估单次补能是否足够",
+                        "若单次补能不足，给出中途补能位置、补给车辆编组或备用车辆切换建议"
+                    ],
+                    "knowledge_trace": "load_slope_profile + unit_energy + total_travel_time → 任务总能耗与耗时 → 与能源容量对比 → 生成补能/补给计划。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "load_slope_profile", "label": "载重与坡度解析结果", "type": "input"},
+                            {"id": "unit_energy", "label": "单位距离能耗估计", "type": "process"},
+                            {"id": "travel_time", "label": "行程时间预测", "type": "process"},
+                            {"id": "total_energy", "label": "总能耗推理", "type": "process"},
+                            {"id": "resupply_plan", "label": "补能与补给建议", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "load_slope_profile", "target": "unit_energy"},
+                            {"source": "unit_energy", "target": "total_energy"},
+                            {"source": "load_slope_profile", "target": "travel_time"},
+                            {"source": "total_energy", "target": "resupply_plan"},
+                            {"source": "travel_time", "target": "resupply_plan"}
+                        ]
+                    }
+                }
+            }
+        },
+    ),
 
-    # 二、设备投放支援模型测试（5~8）
+    # 二、设备投放支援模型测试（7~12）
     Scenario(
         id="equipment_fleet_formation",  # 5. 任务编组
         model_name="设备投放",
@@ -1040,6 +1324,245 @@ SCENARIOS: List[Scenario] = [
                             {"source": "perception", "target": "function"},
                             {"source": "deviation", "target": "judgment"},
                             {"source": "function", "target": "judgment"}
+                        ]
+                    }
+                }
+            }
+        },
+    ),
+    Scenario(
+        id="equipment_drop_site_safety",  # 11. 投放点环境安全性评估
+        model_name="设备投放",
+        name="投放点环境安全性评估",
+        example_input="需在风速较大、地面碎石较多的区域投放设备A。",
+        reasoning_chain="地面状态识别（碎石、坡度）→ 环境因素分析（风速、能见度）→ 降落风险评估（偏移风险、设备损坏风险）→ 策略生成（降低投放高度、调整无人机姿态、改用缓投模式）",
+        prompt=(
+            "【设备投放-投放点环境安全性评估专项要求】\n"
+            "1. 行为树必须至少包含以下核心节点：\n"
+            "   - task_analysis（任务解析）：从任务文本中抽取投放区域地形、障碍物、气象条件与敌情风险等要素；\n"
+            "   - ground_state_recognition（地面状态识别）：识别碎石、坡度、不平整与障碍物分布，可细化出 ground_type_classification 与 obstacle_layout 两个子节点；\n"
+            "   - env_factor_analysis（环境因素分析）：分析风速、风向、能见度等环境因素对投放安全的影响；\n"
+            "   - landing_risk_evaluation（降落风险评估）：综合地面状态与环境因素，对偏移风险、设备损坏风险等进行分级评估；\n"
+            "   - landing_strategy_generation（策略生成，核心决策节点）：根据风险等级给出降落方式/接近策略（降低投放高度、调整无人机姿态、改用缓投模式或更换投放点），必须包含 knowledge_graph 字段。\n"
+            "2. landing_strategy_generation 节点的 knowledge_graph 必须体现：\n"
+            "   地面状态识别(ground_state) → 环境因素分析(env_factors) → 降落风险评估(landing_risk) → 策略生成(landing_strategy) → 投放点安全等级(safety_level)。\n"
+            "3. node_insights 中需：\n"
+            "   - 明确在碎石大、坡度大、风速大等典型组合下的风险判断规则；\n"
+            "   - 给出不同安全等级下建议的投放高度、姿态控制与是否更换投放点的策略；\n"
+            "   - knowledge_trace 体现“任务解析 → 地面与环境建模 → 风险分级 → 策略选择”的完整逻辑链条。"
+        ),
+        example_output={
+            "default_focus": "landing_strategy_generation",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "📍 任务解析：评估碎石+大风区域的投放安全性",
+                "status": "completed",
+                "summary": "解析“需在风速较大、地面碎石较多的区域投放设备A”的描述，抽取地面状态、风场与能见度等关键安全要素。",
+                "children": [
+                    {
+                        "id": "ground_state_recognition",
+                        "label": "地面状态识别",
+                        "status": "completed",
+                        "summary": "识别投放区域地面主要由碎石构成，坡度中等且存在局部不平整。",
+                        "children": []
+                    },
+                    {
+                        "id": "env_factor_analysis",
+                        "label": "环境因素分析",
+                        "status": "completed",
+                        "summary": "分析当前风速较大、风向变化与能见度等因素对投放偏移与姿态稳定性的影响。",
+                        "children": []
+                    },
+                    {
+                        "id": "landing_risk_evaluation",
+                        "label": "降落风险评估",
+                        "status": "completed",
+                        "summary": "综合地面碎石与大风环境，评估设备A存在中高水平的偏移风险与局部撞击风险。",
+                        "children": []
+                    },
+                    {
+                        "id": "landing_strategy_generation",
+                        "label": "✅ 策略生成与安全等级判定",
+                        "status": "active",
+                        "summary": "生成降低投放高度、调整无人机姿态与选择缓投模式等策略，并给出投放点安全等级评定。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务解析",
+                    "summary": "将“风速较大、地面碎石较多的区域投放设备A”的自然语言描述转化为结构化的安全评估要素。",
+                    "key_points": [
+                        "提取投放区域地面类型为碎石，推断摩擦系数与支撑稳定性偏低",
+                        "识别风速较大且可能阵风，易引起投放过程中的姿态扰动与落点偏移",
+                        "为后续风险评估提供地面、风场与设备特性三类输入"
+                    ],
+                    "knowledge_trace": "任务文本解析 → 地面/气象/设备要素抽取 → 形成安全评估输入配置。"
+                },
+                "ground_state_recognition": {
+                    "title": "地面状态识别",
+                    "summary": "通过地图、视觉与先验信息识别地面为碎石、不平整且具有一定坡度。",
+                    "key_points": [
+                        "利用视觉与高度图判断地表主要为松散碎石而非硬质平整地面",
+                        "估计局部坡度与起伏程度，识别潜在滚落或倾倒方向",
+                        "标注附近大型障碍物与空旷区，为落点选择提供参考"
+                    ],
+                    "knowledge_trace": "地面图像与地形数据 → 地面类型与坡度分析 → 输出 ground_state 特征。"
+                },
+                "env_factor_analysis": {
+                    "title": "环境因素分析",
+                    "summary": "对风速、风向与能见度等环境因素进行量化，评估其对投放过程的扰动程度。",
+                    "key_points": [
+                        "根据气象数据与无人机机载传感器估计当前风速与风向波动范围",
+                        "结合能见度与光照条件判断视觉感知与姿态控制的可靠性",
+                        "将风场扰动转化为潜在偏移量与姿态误差的估计"
+                    ],
+                    "knowledge_trace": "气象与传感数据 → 风场与能见度建模 → 输出 env_factors 指标。"
+                },
+                "landing_risk_evaluation": {
+                    "title": "降落风险评估",
+                    "summary": "综合地面碎石与大风环境，对偏移与设备损坏风险进行分级评估。",
+                    "key_points": [
+                        "在碎石+中等坡度组合下，设备落点稍有偏移就可能导致支撑不稳",
+                        "大风与阵风增加投放偏移与姿态失稳概率",
+                        "基于经验阈值将综合风险评为“中高”，建议启用保守投放策略"
+                    ],
+                    "knowledge_trace": "ground_state + env_factors → 风险指标计算 → 输出 landing_risk 等级。"
+                },
+                "landing_strategy_generation": {
+                    "title": "策略生成与安全等级判定",
+                    "summary": "依据降落风险等级生成投放策略，并给出投放点安全等级与建议是否更换投放点。",
+                    "key_points": [
+                        "在中高风险等级下建议降低投放高度、减小水平速度并采用缓投模式",
+                        "根据风向选择更有利的进场方向以降低横向偏移",
+                        "若综合风险超过阈值，则建议更换至邻近更平整、更低风速的备选投放点"
+                    ],
+                    "knowledge_trace": "landing_risk → 候选投放策略评估 → 选择具体策略与安全等级 → 输出安全评估结果与建议。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "ground_state", "label": "地面状态识别结果", "type": "input"},
+                            {"id": "env_factors", "label": "环境因素分析结果", "type": "input"},
+                            {"id": "landing_risk", "label": "降落风险评估", "type": "process"},
+                            {"id": "landing_strategy", "label": "投放策略生成", "type": "decision"},
+                            {"id": "safety_level", "label": "投放点安全等级与建议", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "ground_state", "target": "landing_risk"},
+                            {"source": "env_factors", "target": "landing_risk"},
+                            {"source": "landing_risk", "target": "landing_strategy"},
+                            {"source": "landing_strategy", "target": "safety_level"}
+                        ]
+                    }
+                }
+            }
+        },
+    ),
+    Scenario(
+        id="equipment_drop_anomaly_response",  # 12. 投放流程异常检测与应急策略生成
+        model_name="设备投放",
+        name="投放流程异常检测与应急策略生成",
+        example_input="投放设备时出现挂载装置开合异常。",
+        reasoning_chain="投放动作监测（挂载开合状态、姿态角度）→ 异常模式识别（开合卡滞、偏移、风扰动）→ 风险等级判断 → 应急策略生成（重试开合、调整姿态、切换到备用投放方式、重新选择投放点）",
+        prompt=(
+            "【设备投放-投放流程异常检测与应急策略生成专项要求】\n"
+            "1. 行为树必须至少包含以下核心节点：\n"
+            "   - task_analysis（任务解析）：识别投放流程涉及的关键动作与设备；\n"
+            "   - drop_action_monitoring（投放动作监测）：实时监测挂载开合状态、无人机姿态角度与投放高度变化；\n"
+            "   - anomaly_pattern_recognition（异常模式识别）：识别开合卡滞、姿态偏移、风场扰动等异常模式；\n"
+            "   - risk_level_evaluation（风险等级判断）：根据异常程度与当前高度/环境给出风险分级；\n"
+            "   - emergency_strategy_generation（应急策略生成，核心决策节点）：针对不同风险等级生成重试开合、姿态调整、切换备用投放方式或重新选择投放点等应急策略，必须包含 knowledge_graph 字段。\n"
+            "2. emergency_strategy_generation 节点的 knowledge_graph 必须体现：\n"
+            "   投放动作监测(drop_monitoring) → 异常模式识别(anomaly_pattern) → 风险等级判断(risk_level) → 应急策略生成(emergency_strategy) → 执行结果与流程恢复(execution_result)。\n"
+            "3. node_insights 中需：\n"
+            "   - 描述挂载开合异常、姿态偏移与风场扰动三类典型异常的检测指标；\n"
+            "   - 对不同风险等级说明应急策略的优先顺序与约束条件（如在低高度不宜直接抛投）；\n"
+            "   - knowledge_trace 体现“监测 → 识别 → 分级 → 决策 → 执行与恢复”的闭环。"
+        ),
+        example_output={
+            "default_focus": "emergency_strategy_generation",
+            "behavior_tree": {
+                "id": "drop_action_monitoring",
+                "label": "🎯 投放动作监测",
+                "status": "completed",
+                "summary": "在投放过程中持续监测挂载装置开合状态、无人机姿态与投放高度变化。",
+                "children": [
+                    {
+                        "id": "anomaly_pattern_recognition",
+                        "label": "异常模式识别",
+                        "status": "completed",
+                        "summary": "识别挂载开合卡滞、姿态偏移与风场扰动等异常模式。",
+                        "children": []
+                    },
+                    {
+                        "id": "risk_level_evaluation",
+                        "label": "风险等级判断",
+                        "status": "completed",
+                        "summary": "根据异常类型与当前高度/环境条件，将风险分为低、中、高等级。",
+                        "children": []
+                    },
+                    {
+                        "id": "emergency_strategy_generation",
+                        "label": "✅ 应急策略生成与流程恢复",
+                        "status": "active",
+                        "summary": "针对不同风险等级生成重试开合、姿态调整或切换投放方式等应急策略，并推动流程恢复到安全状态。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "drop_action_monitoring": {
+                    "title": "投放动作监测",
+                    "summary": "对投放过程中的挂载开合、姿态角度与高度变化进行高频监测，为异常识别提供数据基础。",
+                    "key_points": [
+                        "实时读取挂载机构的开合角度、驱动电流与反馈信号",
+                        "监控无人机姿态角与角速度，识别异常俯仰/滚转偏移趋势",
+                        "记录投放高度与垂直速度，以区分不同阶段的安全约束"
+                    ],
+                    "knowledge_trace": "传感器与执行机构数据采集 → 统一时间轴对齐 → 输出用于异常识别的监测序列。"
+                },
+                "anomaly_pattern_recognition": {
+                    "title": "异常模式识别",
+                    "summary": "基于监测数据识别开合卡滞、姿态偏移与风场扰动等典型异常模式。",
+                    "key_points": [
+                        "通过驱动电流突增与位置反馈不一致识别挂载开合卡滞",
+                        "根据姿态角偏离与姿态控制输出不匹配判断姿态异常",
+                        "利用风速/风向突变与位置偏移模式识别风场扰动引发的异常"
+                    ],
+                    "knowledge_trace": "监测序列 → 模式匹配或阈值判断 → 输出 anomaly_pattern 标签与置信度。"
+                },
+                "risk_level_evaluation": {
+                    "title": "风险等级判断",
+                    "summary": "考虑异常类型、当前高度与设备特性，对风险进行分级判断。",
+                    "key_points": [
+                        "在高空轻微卡滞可标记为低至中等级风险，可尝试重试开合",
+                        "在低高度严重姿态偏移可能导致设备或平台损坏，应判定为高风险",
+                        "综合任务重要性与环境复杂度对相同异常进行差异化分级"
+                    ],
+                    "knowledge_trace": "anomaly_pattern + 高度/环境上下文 → 风险规则/模型评估 → 输出 risk_level。"
+                },
+                "emergency_strategy_generation": {
+                    "title": "应急策略生成与流程恢复",
+                    "summary": "根据风险等级和异常类型选择合适的应急策略，使投放流程恢复到安全可控状态。",
+                    "key_points": [
+                        "对低风险卡滞优先尝试在安全高度重试开合并监控结果",
+                        "对中风险姿态偏移先进行姿态调整与悬停稳定，再评估是否继续投放",
+                        "对高风险情况启动终止投放或切换到备用投放方式/备选投放点，并记录事件"
+                    ],
+                    "knowledge_trace": "risk_level + anomaly_pattern → 候选应急动作集 → 选择并执行策略 → 评估流程是否恢复至安全状态。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "drop_monitoring", "label": "投放动作监测数据", "type": "input"},
+                            {"id": "anomaly_pattern", "label": "异常模式识别结果", "type": "process"},
+                            {"id": "risk_level", "label": "风险等级判断", "type": "process"},
+                            {"id": "emergency_strategy", "label": "应急策略生成", "type": "decision"},
+                            {"id": "execution_result", "label": "执行结果与流程恢复状态", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "drop_monitoring", "target": "anomaly_pattern"},
+                            {"source": "anomaly_pattern", "target": "risk_level"},
+                            {"source": "risk_level", "target": "emergency_strategy"},
+                            {"source": "emergency_strategy", "target": "execution_result"}
                         ]
                     }
                 }
@@ -1644,7 +2167,14 @@ SCENARIOS: List[Scenario] = [
                         "label": "✅ 动态舒适性调整",
                         "status": "active",
                         "summary": "根据实时振动/颠簸感知对行驶速度与局部路径进行微调。",
-                        "children": []
+                        "children": [],
+                        "control_meta": {
+                            "control_type": "decentralized_rl",
+                            "agent_scope": ["transport_vehicle"],
+                            "policy_id": "comfort_dynamic_adjust_pi",
+                            "algo_family": "DTDE_consistency_AC",
+                            "training_scenario": "personnel_comfort_routing"
+                        }
                     }
                 ]
             },
@@ -1687,7 +2217,7 @@ SCENARIOS: List[Scenario] = [
                         "在允许的范围内对车道内横向位置或微小绕行路径做优化",
                         "记录颠簸热点区域，为后续任务更新路况与舒适度模型"
                     ],
-                    "knowledge_trace": "实时传感数据 → 与舒适度阈值对比 → 触发速度/路径微调控制指令。",
+                    "knowledge_trace": "实时传感数据 → 与舒适度阈值对比 → 触发速度/路径微调控制指令；具体速度曲线与微小绕行动作由去中心化RL策略 comfort_dynamic_adjust_pi 在车辆智能体上在线生成，实现个体与全局舒适性的兼顾。",
                     "knowledge_graph": {
                         "nodes": [
                             {"id": "road", "label": "路况解析结果", "type": "input"},
@@ -1748,7 +2278,14 @@ SCENARIOS: List[Scenario] = [
                         "label": "✅ 安全策略更新",
                         "status": "active",
                         "summary": "基于实时风险自动调整行驶参数与告警策略。",
-                        "children": []
+                        "children": [],
+                        "control_meta": {
+                            "control_type": "decentralized_rl",
+                            "agent_scope": ["transport_vehicle"],
+                            "policy_id": "safety_strategy_update_pi",
+                            "algo_family": "DTDE_consistency_AC",
+                            "training_scenario": "personnel_safety_monitor"
+                        }
                     }
                 ]
             },
@@ -1791,7 +2328,7 @@ SCENARIOS: List[Scenario] = [
                         "在乘员状态较差时偏向更平稳的加减速策略",
                         "在风险解除后逐步恢复常规行驶策略"
                     ],
-                    "knowledge_trace": "异常处理结果反馈 → 更新速度、加速度与告警阈值 → 持续闭环优化安全策略。",
+                    "knowledge_trace": "异常处理结果反馈 → 更新速度、加速度与告警阈值 → 持续闭环优化安全策略；行驶参数与告警阈值的具体调整由去中心化RL策略 safety_strategy_update_pi 在车辆智能体侧基于本地观测与邻居信息分布式优化。",
                     "knowledge_graph": {
                         "nodes": [
                             {"id": "pax", "label": "乘员状态监控", "type": "input"},
@@ -1852,7 +2389,14 @@ SCENARIOS: List[Scenario] = [
                         "label": "✅ 多车协同调度",
                         "status": "active",
                         "summary": "生成多车之间的任务分工与时间协调方案。",
-                        "children": []
+                        "children": [],
+                        "control_meta": {
+                            "control_type": "decentralized_rl",
+                            "agent_scope": ["vehicle_1", "vehicle_2", "vehicle_3"],
+                            "policy_id": "multi_dest_dispatch_pi",
+                            "algo_family": "DTDE_consistency_AC",
+                            "training_scenario": "personnel_multi_destination_dispatch"
+                        }
                     }
                 ]
             },
@@ -1963,7 +2507,14 @@ SCENARIOS: List[Scenario] = [
                         "label": "✅ 异常识别",
                         "status": "active",
                         "summary": "发现资源丢失、库存异常或传感器失联等异常情况并上报。",
-                        "children": []
+                        "children": [],
+                        "control_meta": {
+                            "control_type": "decentralized_rl_consensus",
+                            "agent_scope": ["depot_nodes", "frontline_nodes"],
+                            "policy_id": "resource_anomaly_detection_pi",
+                            "algo_family": "DTDE_consistency_Q_or_AC",
+                            "training_scenario": "resource_tracking"
+                        }
                     }
                 ]
             },
@@ -2172,7 +2723,14 @@ SCENARIOS: List[Scenario] = [
                         "label": "✅ 任务执行检测与回传",
                         "status": "active",
                         "summary": "监控补给任务执行情况，完成后更新库存状态。",
-                        "children": []
+                        "children": [],
+                        "control_meta": {
+                            "control_type": "decentralized_rl_consensus",
+                            "agent_scope": ["supply_vehicles", "depots", "frontline_receivers"],
+                            "policy_id": "replenishment_execution_monitor_pi",
+                            "algo_family": "DTDE_consistency_AC",
+                            "training_scenario": "resource_replenishment_dispatch"
+                        }
                     }
                 ]
             },
@@ -2215,7 +2773,7 @@ SCENARIOS: List[Scenario] = [
                         "在完成装卸后更新目标单位与源仓库库存",
                         "异常中断时生成告警并建议改派车辆或调整路线"
                     ],
-                    "knowledge_trace": "车队执行数据 + 仓储变更记录 → 补给任务完成度评估与库存同步。",
+                    "knowledge_trace": "车队执行数据 + 仓储变更记录 → 补给任务完成度评估与库存同步；跨车辆、仓库与前线接收单位的执行决策与状态一致性由去中心化RL一致性策略 replenishment_execution_monitor_pi 在各类智能体间通过分布式协同实现。",
                     "knowledge_graph": {
                         "nodes": [
                             {"id": "short", "label": "短缺识别结果", "type": "input"},
