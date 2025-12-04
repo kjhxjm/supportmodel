@@ -550,7 +550,8 @@ function renderInsightGraph(graphData) {
             height: container.offsetHeight - 10, // 留边距
             linkCenter: true,
             modes: {
-                default: ['drag-canvas', 'zoom-canvas'],
+                // 允许拖动画布、缩放画布，以及直接拖动节点
+                default: ['drag-canvas', 'zoom-canvas', 'drag-node'],
             },
             defaultNode: {
                 size: 80,
