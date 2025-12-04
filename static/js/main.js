@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 检查URL参数，如果有input参数则自动填充并触发推理
     const urlParams = new URLSearchParams(window.location.search);
     const inputParam = urlParams.get('input');
+    const controlPanel = document.querySelector('.control-panel');
+    const header = document.querySelector('.header');
     
     if (inputParam) {
         const taskInput = document.getElementById('taskInput');
@@ -27,6 +29,10 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatus(true);
             updateDisplay();
         }
+
+        // 如果通过URL携带了 input 参数，则隐藏任务输入面板
+        if (controlPanel) controlPanel.style.display = 'none';
+        if (header) header.style.display = 'none';
     } else {
         // 没有URL参数时，正常更新显示
         updateDisplay();
