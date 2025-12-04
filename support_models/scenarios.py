@@ -190,7 +190,7 @@ SCENARIOS: List[Scenario] = [
                             {"id": "fleet_config", "label": "最终配置(2辆中型越野无人车)", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "task_parsing", "target": "vehicle_matching"},
+                            {"source": "task_parsing", "target": "quantity_calc"},
                             {"source": "vehicle_matching", "target": "quantity_calc"},
                             {"source": "quantity_calc", "target": "loading_scheme"},
                             {"source": "loading_scheme", "target": "fleet_config"}
@@ -584,24 +584,31 @@ SCENARIOS: List[Scenario] = [
                     "title": "协同动作管理",
                     "summary": "为4车队列规划在掉头、避障、通过狭窄路段等典型场景下的协同动作顺序与通信同步方案。",
                     "key_points": [
-                        "识别需要协同的动作类型：依序掉头、整体倒置、紧急避让等",
-                        "为每种动作制定车辆执行顺序与触发条件",
-                        "通过车间通信实现动作指令与状态的实时同步"
+                        "识别需要协同的动作类型：依序掉头、整体倒置、紧急避让等，并为每辆车建立本地决策规则",
+                        "各车辆基于自身局部感知与历史轨迹维护本地策略/值函数，通过车间通信交换关键信息",
+                        "在分布式一致性更新后形成协同动作策略，并按既定顺序执行与状态同步"
                     ],
-                    "knowledge_trace": "编队规划结果 → 动作需求识别 → 协同策略制定 → 执行顺序与状态同步设计。",
+                    "knowledge_trace": "编队规划结果 → 各车本地策略与轨迹收集 → 分布式一致性聚合与去中心化策略更新 → 形成协同动作策略并执行与同步。",
                     "knowledge_graph": {
                         "nodes": [
                             {"id": "formation_planning", "label": "编队规划结果", "type": "input"},
-                            {"id": "action_requirement", "label": "动作需求识别", "type": "process"},
-                            {"id": "coordination_strategy", "label": "协同策略设计", "type": "process"},
-                            {"id": "execution_sequence", "label": "执行顺序规划", "type": "decision"},
-                            {"id": "status_sync", "label": "车队状态同步", "type": "output"}
+                            {"id": "local_policy_agents", "label": "各车本地策略 π_i / Q_i", "type": "process"},
+                            {"id": "local_experience", "label": "本地轨迹与经验回放 D_i", "type": "process"},
+                            {"id": "consensus_weight", "label": "分布式一致性权重估计 ω(τ)", "type": "process"},
+                            {"id": "decentralized_update", "label": "去中心化策略更新(Actor–Critic)", "type": "process"},
+                            {"id": "coordination_strategy", "label": "协同动作策略", "type": "process"},
+                            {"id": "execution_sequence", "label": "协同行动执行顺序", "type": "decision"},
+                            {"id": "status_sync", "label": "车队状态同步与反馈", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "formation_planning", "target": "action_requirement"},
-                            {"source": "action_requirement", "target": "coordination_strategy"},
+                            {"source": "formation_planning", "target": "local_policy_agents"},
+                            {"source": "local_policy_agents", "target": "local_experience"},
+                            {"source": "local_experience", "target": "consensus_weight"},
+                            {"source": "consensus_weight", "target": "decentralized_update"},
+                            {"source": "decentralized_update", "target": "coordination_strategy"},
                             {"source": "coordination_strategy", "target": "execution_sequence"},
-                            {"source": "execution_sequence", "target": "status_sync"}
+                            {"source": "execution_sequence", "target": "status_sync"},
+                            {"source": "status_sync", "target": "local_policy_agents"}
                         ]
                     }
                 }
@@ -1882,23 +1889,29 @@ SCENARIOS: List[Scenario] = [
                 },
                 "multi_vehicle_coordination": {
                     "title": "多车协同调度",
-                    "summary": "在各车辆停靠顺序基础上进行跨车协同，提升整体效率与鲁棒性。",
+                    "summary": "在各车辆停靠顺序基础上进行跨车协同，利用去中心化决策与信息一致性提升整体效率与鲁棒性。",
                     "key_points": [
-                        "在多辆车之间分配人员与目的地任务，平衡负载与时间",
-                        "预留车辆间的交叉接驳或任务转移方案以应对故障",
-                        "将最终计划转化为每辆车的时空轨迹与任务时间表"
+                        "在多辆车之间分配人员与目的地任务，各车基于本地任务视角维护本地策略与代价估计",
+                        "通过分布式通信在车辆间交换代价与任务负载信息，达到近似一致的全局调度视图",
+                        "在此基础上去中心化地更新各车停靠与接驳策略，将最终结果转化为每辆车的时空轨迹与任务时间表"
                     ],
-                    "knowledge_trace": "停靠顺序 + 资源约束 → 协同优化 → 输出多车协同调度方案。",
+                    "knowledge_trace": "任务拆解 + 路径代价矩阵 → 各车本地调度策略与经验收集 → 分布式一致性聚合与策略更新 → 输出多车协同调度方案。",
                     "knowledge_graph": {
                         "nodes": [
                             {"id": "decomp", "label": "任务拆解结果", "type": "input"},
                             {"id": "cost", "label": "路径代价矩阵", "type": "process"},
-                            {"id": "seq", "label": "车辆停靠顺序", "type": "process"},
+                            {"id": "local_policy", "label": "各车本地调度策略 π_i", "type": "process"},
+                            {"id": "local_experience", "label": "本地执行轨迹与经验池 D_i", "type": "process"},
+                            {"id": "consensus", "label": "分布式一致性信息聚合", "type": "process"},
+                            {"id": "seq", "label": "车辆停靠顺序与任务分配", "type": "process"},
                             {"id": "coord", "label": "多车协同调度方案", "type": "output"}
                         ],
                         "edges": [
                             {"source": "decomp", "target": "cost"},
-                            {"source": "cost", "target": "seq"},
+                            {"source": "cost", "target": "local_policy"},
+                            {"source": "local_policy", "target": "local_experience"},
+                            {"source": "local_experience", "target": "consensus"},
+                            {"source": "consensus", "target": "seq"},
                             {"source": "decomp", "target": "seq"},
                             {"source": "seq", "target": "coord"}
                         ]
@@ -1987,25 +2000,29 @@ SCENARIOS: List[Scenario] = [
                 },
                 "anomaly_detection": {
                     "title": "异常识别",
-                    "summary": "比较期望状态与实时状态，识别资源丢失、库存异常和传感器失联。",
+                    "summary": "比较期望状态与实时状态，识别资源丢失、库存异常和传感器失联，并通过多节点去中心化协同提高判断鲁棒性。",
                     "key_points": [
-                        "当账面数量与盘点结果差异超出阈值时标记为库存异常",
-                        "在无任务记录的情况下出现位置剧烈变化时提示可能丢失或误记",
-                        "若追踪设备长时间无上报，判定为传感器失联并建议人工核查"
+                        "当账面数量与盘点结果差异超出阈值时标记为库存异常，各补给节点在本地先给出初步判定",
+                        "利用去中心化一致性算法在多节点间交换与聚合异常线索，降低单点误报影响",
+                        "在一致性判断的基础上触发资源丢失、库存异常或传感器失联的告警，并建议人工核查或自动补救"
                     ],
-                    "knowledge_trace": "期望状态(模型) + 实时状态(追踪) → 差异分析 → 输出异常清单与告警等级。",
+                    "knowledge_trace": "期望状态(模型) + 实时状态(追踪) → 各节点本地异常检测与轨迹记录 → 分布式一致性聚合 → 输出全局异常清单与告警等级。",
                     "knowledge_graph": {
                         "nodes": [
                             {"id": "cat", "label": "资源类别模型", "type": "input"},
-                            {"id": "track", "label": "追踪方式与读数", "type": "process"},
-                            {"id": "status", "label": "资源状态更新", "type": "process"},
-                            {"id": "anom", "label": "异常识别结果", "type": "output"}
+                            {"id": "track", "label": "追踪方式与读数(多节点)", "type": "process"},
+                            {"id": "status", "label": "资源状态更新(本地视角)", "type": "process"},
+                            {"id": "local_anom", "label": "本地异常检测结果", "type": "process"},
+                            {"id": "consensus_anom", "label": "分布式一致性异常聚合", "type": "process"},
+                            {"id": "anom", "label": "全局异常识别结果", "type": "output"}
                         ],
                         "edges": [
                             {"source": "cat", "target": "track"},
                             {"source": "track", "target": "status"},
                             {"source": "cat", "target": "status"},
-                            {"source": "status", "target": "anom"}
+                            {"source": "status", "target": "local_anom"},
+                            {"source": "local_anom", "target": "consensus_anom"},
+                            {"source": "consensus_anom", "target": "anom"}
                         ]
                     }
                 }

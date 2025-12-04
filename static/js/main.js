@@ -144,8 +144,15 @@ function updateDisplay() {
     })
         .then(res => res.json())
         .then(data => {
+            // ===== 调试输出：后端返回的整体数据 =====
+            console.log('[updateDisplay] response data:', data);
+
             // 缓存节点洞察，后续点击节点时不再请求后端
             currentState.node_insights = data.node_insights || {};
+
+            // ===== 调试输出：行为树与节点洞察 =====
+            console.log('[updateDisplay] behavior_tree:', data.behavior_tree);
+            console.log('[updateDisplay] node_insights:', currentState.node_insights);
 
             renderBehaviorTree(data.behavior_tree);
             selectedNodeId = data.default_node_id;
@@ -433,6 +440,9 @@ function updateInsightPanel(insight) {
     const graphContainer = document.getElementById('insightGraphContainer');
     const textContainer = document.getElementById('insightTextContainer');
 
+    // ===== 调试输出：当前节点洞察 =====
+    console.log('[updateInsightPanel] insight:', insight);
+
     // 渲染知识图谱
     if (insight && insight.knowledge_graph) {
         renderInsightGraph(insight.knowledge_graph);
@@ -515,7 +525,11 @@ function renderInsightGraph(graphData) {
     const container = document.getElementById('insightGraphContainer');
     if (!container) return;
 
+    // ===== 调试输出：原始知识图谱数据 =====
+    console.log('[renderInsightGraph] raw graphData:', graphData);
+
     if (!graphData || !graphData.nodes || graphData.nodes.length === 0) {
+        console.warn('[renderInsightGraph] empty knowledge_graph, skip render.');
         container.style.display = 'none';
         return;
     }
@@ -524,6 +538,9 @@ function renderInsightGraph(graphData) {
 
     // 转换数据格式为G6所需的格式
     const g6Data = convertInsightToG6Format(graphData);
+
+    // ===== 调试输出：转换后的G6数据 =====
+    console.log('[renderInsightGraph] g6Data for G6:', g6Data);
 
     if (!insightGraphObj) {
         // 初始化G6知识图谱
