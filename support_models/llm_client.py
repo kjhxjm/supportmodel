@@ -20,14 +20,17 @@ def _get_client() -> OpenAI:
     """
     global _client
     if _client is None:
-        base_url = os.environ.get("GLM_BASE_URL")
-        api_key = os.environ.get("GLM_API_KEY")
+        # base_url = os.environ.get("GLM_BASE_URL")
+        # api_key = os.environ.get("GLM_API_KEY")
+        base_url = os.environ.get("ARK_BASE_URL")
+        api_key = os.environ.get("ARK_API_KEY")
+
         if not base_url or not api_key:
             raise RuntimeError(
                 "GLM_BASE_URL 或 GLM_API_KEY 未配置，无法调用大模型生成蓝图。"
             )
         print(
-            f"[LLM] 初始化 OpenAI 客户端 base_url={base_url!r}, model={os.environ.get('GLM_MODEL_NAME', 'glm-4-flash')!r}",
+            f"[LLM] 初始化 OpenAI 客户端 base_url={base_url!r}, model={os.environ.get('MODEL_NAME', 'glm-4-flash')!r}",
             file=sys.stderr,
         )
         _client = OpenAI(base_url=base_url, api_key=api_key)
@@ -308,7 +311,7 @@ def _extract_json(content: str) -> Dict[str, Any]:
 
     - 优先直接 json.loads
     - 若失败，则尝试移除 Markdown 代码块标记
-    - 再尝试截取首尾花括号之间内容再解析
+    - 再尝试使用平衡括号算法提取完整的 JSON 对象
     """
     content = content.strip()
     
@@ -323,29 +326,109 @@ def _extract_json(content: str) -> Dict[str, Any]:
             lines = lines[:-1]
         content = "\n".join(lines).strip()
     
+    # 尝试直接解析
     try:
         return json.loads(content)
     except json.JSONDecodeError:
-        # 尝试从首尾大括号截取
-        start = content.find("{")
+        pass
+    
+    # 尝试从首尾大括号截取（使用平衡括号算法）
+    start = content.find("{")
+    if start != -1:
+        # 使用平衡括号算法找到匹配的结束括号
+        bracket_count = 0
+        in_string = False
+        escape_next = False
+        
+        for i in range(start, len(content)):
+            char = content[i]
+            
+            if escape_next:
+                escape_next = False
+                continue
+            
+            if char == '\\':
+                escape_next = True
+                continue
+            
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+            
+            if not in_string:
+                if char == '{':
+                    bracket_count += 1
+                elif char == '}':
+                    bracket_count -= 1
+                    if bracket_count == 0:
+                        # 找到匹配的结束括号
+                        end = i
+                        snippet = content[start : end + 1]
+                        try:
+                            return json.loads(snippet)
+                        except json.JSONDecodeError:
+                            pass
+                        break
+        
+        # 如果平衡括号算法失败，尝试简单的首尾截取
         end = content.rfind("}")
-        if start != -1 and end != -1 and end > start:
+        if end != -1 and end > start:
             snippet = content[start : end + 1]
             try:
                 return json.loads(snippet)
             except json.JSONDecodeError:
                 pass
+    
+    # 最后尝试：查找所有可能的JSON对象，选择最长的有效对象
+    json_candidates = []
+    start_pos = 0
+    while True:
+        start = content.find("{", start_pos)
+        if start == -1:
+            break
         
-        # 如果还是失败，尝试查找 JSON 对象（可能有多行注释）
-        # 尝试匹配第一个完整的 JSON 对象
-        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content, re.DOTALL)
-        if json_match:
-            try:
-                return json.loads(json_match.group(0))
-            except json.JSONDecodeError:
-                pass
+        bracket_count = 0
+        in_string = False
+        escape_next = False
         
-        raise ValueError(f"无法从内容中提取有效的 JSON。内容开头：{content[:200]}")
+        for i in range(start, len(content)):
+            char = content[i]
+            
+            if escape_next:
+                escape_next = False
+                continue
+            
+            if char == '\\':
+                escape_next = True
+                continue
+            
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+            
+            if not in_string:
+                if char == '{':
+                    bracket_count += 1
+                elif char == '}':
+                    bracket_count -= 1
+                    if bracket_count == 0:
+                        end = i
+                        snippet = content[start : end + 1]
+                        try:
+                            parsed = json.loads(snippet)
+                            json_candidates.append((len(snippet), parsed))
+                        except json.JSONDecodeError:
+                            pass
+                        break
+        
+        start_pos = start + 1
+    
+    # 选择最长的有效JSON对象
+    if json_candidates:
+        json_candidates.sort(reverse=True)  # 按长度降序排列
+        return json_candidates[0][1]
+    
+    raise ValueError(f"无法从内容中提取有效的 JSON。内容开头：{content[:500]}")
 
 
 def generate_blueprint_with_llm(
@@ -386,12 +469,12 @@ def generate_blueprint_with_llm(
 
     client = _get_client()
     print(
-        f"[LLM] 调用蓝图生成: model={os.environ.get('GLM_MODEL_NAME', 'glm-4-flash')}, "
+        f"[LLM] 调用蓝图生成: model={os.environ.get('MODEL_NAME', 'glm-4-flash')}, "
         f"support_model={model_name}, scenario_id={getattr(scenario, 'id', None)}, score={score:.3f}",
         file=sys.stderr,
     )
     response = client.chat.completions.create(
-        model=os.environ.get("GLM_MODEL_NAME", "glm-4-flash"),
+        model=os.environ.get("MODEL_NAME", "glm-4-flash"),
         messages=messages,
     )
 
@@ -407,14 +490,18 @@ def generate_blueprint_with_llm(
         raw_content = str(message.content or "")
 
     print("[LLM] 蓝图生成完成，开始解析 JSON", file=sys.stderr)
+    print(f"[LLM] 原始内容长度: {len(raw_content)} 字符", file=sys.stderr)
     try:
         blueprint = _extract_json(raw_content)
+        print(f"[LLM] JSON提取成功，提取出的键: {list(blueprint.keys())}", file=sys.stderr)
         
         # 验证蓝图结构
         if not isinstance(blueprint, dict):
             raise ValueError("蓝图必须是字典类型")
         
         if "behavior_tree" not in blueprint:
+            print(f"[LLM] 调试: 提取出的JSON结构: {list(blueprint.keys())}", file=sys.stderr)
+            print(f"[LLM] 调试: 原始内容前1000字符: {raw_content[:1000]}", file=sys.stderr)
             raise ValueError("蓝图缺少 'behavior_tree' 字段")
         
         if "node_insights" not in blueprint:
@@ -470,7 +557,10 @@ def generate_blueprint_with_llm(
         
     except (ValueError, json.JSONDecodeError) as e:
         print(f"[LLM] 蓝图解析或验证失败: {e}", file=sys.stderr)
-        print(f"[LLM] 原始内容前500字符: {raw_content[:500]}", file=sys.stderr)
+        print(f"[LLM] 原始内容长度: {len(raw_content)} 字符", file=sys.stderr)
+        print(f"[LLM] 原始内容前1000字符: {raw_content[:1000]}", file=sys.stderr)
+        if len(raw_content) > 1000:
+            print(f"[LLM] 原始内容后500字符: {raw_content[-500:]}", file=sys.stderr)
         raise
 
     return BlueprintResult(
@@ -491,12 +581,12 @@ def classify_model_with_llm(task_description: str) -> ClassificationResult:
 
     client = _get_client()
     print(
-        f"[LLM] 调用模型分类: model={os.environ.get('GLM_MODEL_NAME', 'glm-4-flash')}, "
+        f"[LLM] 调用模型分类: model={os.environ.get('MODEL_NAME', 'glm-4-flash')}, "
         f"task_snippet={task_description[:40]!r}",
         file=sys.stderr,
     )
     response = client.chat.completions.create(
-        model=os.environ.get("GLM_MODEL_NAME", "glm-4-flash"),
+        model=os.environ.get("MODEL_NAME", "glm-4-flash"),
         messages=messages,
     )
 
