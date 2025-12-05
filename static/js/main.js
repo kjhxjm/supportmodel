@@ -11,6 +11,7 @@ let insightGraphObj = null; // 右侧知识图谱G6实例
 
 document.addEventListener('DOMContentLoaded', () => {
     initializeControls();
+    registerShortcuts();
     
     // 检查URL参数，如果有input参数则自动填充并触发推理
     const urlParams = new URLSearchParams(window.location.search);
@@ -115,6 +116,40 @@ function initializeControls() {
     updateStatus(false);
 }
 
+// 快捷键：Ctrl + 数字键填充示例任务并自动推理
+function registerShortcuts() {
+    const taskInput = document.getElementById('taskInput');
+    const shortcutInputs = {
+        '1': '向位置X运输资源Y，道路存在不确定损毁风险，要求Z小时内送达。',
+        '2': '向X位置运输资源Y，道路可能受损',
+        '3': '向X位置运输冷冻食品Y',
+        '4': '向X位置运输4车食品和水',
+        '5': '向X前沿阵地投放侦察装置Y，需要多架无人机协同运输',
+        '6': '向X区域精确投放传感器Y',
+        '7': '将设备Y通过无人车运输至X点，并由机械臂自主卸载',
+        '8': '将侦察节点Y投放至X点并确认部署成功',
+        '9': '在X区域发现两名伤员，需要无人救援设备前往救助并运回安全点',
+        '0': '对X位置可能受伤的人员进行远程伤情初判',
+    };
+
+    document.addEventListener('keydown', (e) => {
+        if (!e.ctrlKey || e.altKey || e.metaKey) return;
+        const key = e.key;
+        if (!shortcutInputs[key]) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const presetText = shortcutInputs[key];
+        if (taskInput) {
+            taskInput.value = presetText;
+        }
+        currentState.task_description = presetText.trim();
+        updateStatus(true);
+        updateDisplay();
+    });
+}
+
 function updateStatus(isRunning) {
     const indicator = document.getElementById('statusIndicator');
     const statusText = document.getElementById('statusText');
@@ -200,6 +235,7 @@ function renderBehaviorTree(treeData) {
                 default: [
                     'drag-canvas',
                     'zoom-canvas',
+                    'drag-node',
                 ],
             },
             defaultNode: {

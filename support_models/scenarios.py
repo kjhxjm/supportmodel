@@ -26,7 +26,7 @@ SCENARIOS: List[Scenario] = [
         id="offroad_fleet_formation",  # 1. 任务编组
         model_name="越野物流",
         name="任务编组",
-        example_input="向位置X运输资源Y，道路存在不确定损毁风险，要求Z小时内送达。",
+        example_input="向位置X运输资源Y，道路存在不确定损毁风险，要求2小时内送达。",
         reasoning_chain="任务解析（运输、重量、时限、路况）→ 车辆类型匹配（选择中型越野无人车，理由：载重能力与地形适应性）→ 数量计算（基于单车载重和冗余要求推导车辆数量）→ 装载方案（物资分配与固定方式）",
         prompt=(
             "【越野物流-任务编组专项要求（详细输出版）】\n"
@@ -508,29 +508,29 @@ SCENARIOS: List[Scenario] = [
             "default_focus": "anomaly_handling",
             "behavior_tree": {
                 "id": "task_analysis",
-                "label": "🚛 任务解析：向X位置运输冷冻食品Y",
+                "label": "🚛 任务解析：冷冻食品Y运往位置X，需全程冷链",
                 "status": "completed",
-                "summary": "解析冷冻食品Y的运输要求：保持在规定低温区间，尽量避免剧烈震动，确保全程冷链不中断。",
+                "summary": "解析冷冻食品Y需全程保持冷链温区、控制越野震动并在时限内送达X，输出可执行的运输要求。",
                 "children": [
                     {
                         "id": "vehicle_matching",
-                        "label": "车辆匹配",
+                        "label": "🚚 车辆匹配：冷链越野车+温度传感器",
                         "status": "completed",
-                        "summary": "选择具备冷链仓、温度传感器与基础减震能力的越野运输车辆。",
+                        "summary": "选择具备密闭冷链舱、双温度传感器与减震底盘的越野车，制冷与续航覆盖任务时长。",
                         "children": []
                     },
                     {
                         "id": "monitoring_setup",
-                        "label": "监控设置",
+                        "label": "🛰️ 监控设置：温度秒级采样，阈值基于冷链标准",
                         "status": "completed",
-                        "summary": "配置温度与震动传感器采样频率、告警阈值与上报策略。",
+                        "summary": "配置温度秒级采样、震动高频采样；温度偏离冷链标准即预警，正常周期上报，异常加密上报。",
                         "children": []
                     },
                     {
                         "id": "anomaly_handling",
-                        "label": "异常感知与处理",
+                        "label": "⚠️ 货物监控与保全：温度越界或震动超标即告警",
                         "status": "active",
-                        "summary": "实时监测冷链仓温度和运输震动情况，一旦异常立即触发保全策略并记录闭环结果。",
+                        "summary": "持续监测温度/震动，偏离冷链温区或震动超标即分级告警，并执行调温、减速/改道、停车检查等动作并闭环记录。",
                         "children": []
                     }
                 ]
@@ -538,52 +538,64 @@ SCENARIOS: List[Scenario] = [
             "node_insights": {
                 "task_analysis": {
                     "title": "任务解析",
-                    "summary": "将“向X位置运输冷冻食品Y”拆解为温度控制、震动限制与时效约束三个关键方面。",
+                    "summary": "将“向X位置运输冷冻食品Y”细化为保持冷链温区、抑制越野震动、按时送达的三项硬约束。",
                     "key_points": [
-                        "识别冷冻食品Y对温度区间的严格约束（如 -18℃ 以下）",
-                        "考虑越野路面带来的震动风险对包装与产品质量的影响",
-                        "评估运输时长对冷链设备持续工作的要求"
+                        "明确需保持冷链温区（符合冷冻食品标准），持续性超限需处理",
+                        "震动需控制在包装/货品可接受范围，超标触发减速与检查",
+                        "时效要求在任务约束内送达，并预留异常处置缓冲"
                     ],
-                    "knowledge_trace": "货物属性分析 → 约束条件抽取 → 形成冷链运输任务配置。"
+                    "knowledge_trace": "任务文本解析 → 温度/震动/时限约束提取 → 形成冷链运输标准输入。"
                 },
                 "vehicle_matching": {
                     "title": "车辆匹配",
-                    "summary": "在可用车辆中选择具备冷链舱、温度传感器与适度减震能力的越野平台。",
+                    "summary": "选用具备独立制冷、双温度传感器与减震能力的冷链越野车，可支持冗余与持续冷链。",
                     "key_points": [
-                        "筛选具备密闭冷链舱与独立制冷单元的车辆",
-                        "确保车体具备足够的悬挂行程以降低越野震动",
-                        "确认电源与制冷能力可以覆盖任务全程"
+                        "车辆配置：冷链舱+独立制冷单元，支持持续低温运行",
+                        "感知配置：双温度探头分区监测，具备基础校准能力",
+                        "减震能力：越野悬挂与胎压调节，降低路面冲击",
+                        "冗余策略：至少双车以便故障切换或补位",
+                        "供电与续航：制冷与行驶续航覆盖任务时长并留有余量"
                     ],
-                    "knowledge_trace": "货物冷链需求 → 车辆配置筛查 → 选定满足温控与减震能力的车辆。"
+                    "knowledge_trace": "冷链温度/震动要求 → 车辆候选筛选 → 选定双传感器冷链越野车。"
                 },
                 "monitoring_setup": {
                     "title": "监控设置",
-                    "summary": "为冷链仓配置温度与震动监控方案，设置采样频率与多级告警阈值。",
+                    "summary": "温度采用秒级采样、震动高频采样；基于冷链标准设置预警/告警阈值，超限触发加密上报与动作。",
                     "key_points": [
-                        "设定温度传感器高/低阈值与连续超限判定时间窗",
-                        "配置震动传感器的采样频率与峰值/均方根告警标准",
-                        "定义正常上报周期与异常时的加密快速上报机制"
+                        "采样频率：温度保持秒级，震动保持高频，异常时可临时提升",
+                        "阈值设计：温度偏离冷链标准、震动超出包装承受值即预警",
+                        "上报策略：正常周期上报，预警缩短周期，告警实时+事件日志",
+                        "震动门限：超过设定上限时触发减速与检查提示",
+                        "冗余校验：双探头读数偏差超设定门限时触发自检/校准提醒"
                     ],
-                    "knowledge_trace": "监控参数设计 → 阈值与频率配置 → 与告警与上报逻辑绑定。"
+                    "knowledge_trace": "监控参数设计 → 采样/阈值/上报配置 → 绑定告警触发条件。"
                 },
                 "anomaly_handling": {
-                    "title": "异常感知与处理",
-                    "summary": "在发现温度或震动异常时，快速评估风险等级并触发调温、减速或停车等保全措施。",
+                    "title": "货物监控与保全",
+                    "summary": "基于温度/震动实时数据分级响应：预警调温+减速，告警改道或短暂停靠，紧急阶段停车保持制冷并人工确认。",
                     "key_points": [
-                        "对采集到的温度与震动数据进行实时阈值与趋势分析",
-                        "根据偏差程度划分为预警、告警与紧急三类等级",
-                        "针对不同等级执行调整制冷功率、降低车速或紧急停车检查等动作"
+                        "检测链路：温度/震动→阈值判断→趋势预测，持续超限即进入预警",
+                        "分级策略：预警→调温+减速；告警→改道/短暂停靠；紧急→停车+人工检查",
+                        "频率提升：进入预警后提升采样与上报频率，确保闭环",
+                        "闭环记录：执行动作后记录“阈值-时间-动作-结果”，供后续复盘",
+                        "可靠性校验：动作后若温度/震动未恢复，触发备用车辆接替或继续处置"
                     ],
-                    "knowledge_trace": "状态监测 → 异常识别 → 风险分级 → 选择保全策略 → 执行动作并记录反馈。",
+                    "knowledge_trace": "货物运输要求 → 车辆匹配 → 监控配置 → 异常识别 → 风险分级 → 保全动作执行与结果回写。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "status_monitoring", "label": "状态监测(温度/震动)", "type": "input"},
-                            {"id": "anomaly_detection", "label": "异常识别", "type": "process"},
-                            {"id": "risk_assessment", "label": "风险评估", "type": "process"},
-                            {"id": "preservation_strategy", "label": "保全策略选择", "type": "decision"},
-                            {"id": "action_response", "label": "执行响应与记录", "type": "output"}
+                            {"id": "cargo_requirements", "label": "货物要求(冷链温区,抗震需求)", "type": "input"},
+                            {"id": "vehicle_matching", "label": "车辆匹配(冷链越野车,双探头)", "type": "process"},
+                            {"id": "monitoring_setup", "label": "监控配置(温度秒级,震动高频)", "type": "process"},
+                            {"id": "status_monitoring", "label": "状态监测(实时温度/震动)", "type": "input"},
+                            {"id": "anomaly_detection", "label": "异常识别(阈值+趋势)", "type": "process"},
+                            {"id": "risk_assessment", "label": "风险评估(预警/告警/紧急)", "type": "process"},
+                            {"id": "preservation_strategy", "label": "保全策略(调温/减速/改道/停车)", "type": "decision"},
+                            {"id": "action_response", "label": "执行响应(加密上报,动作日志)", "type": "output"}
                         ],
                         "edges": [
+                            {"source": "cargo_requirements", "target": "vehicle_matching"},
+                            {"source": "vehicle_matching", "target": "monitoring_setup"},
+                            {"source": "monitoring_setup", "target": "status_monitoring"},
                             {"source": "status_monitoring", "target": "anomaly_detection"},
                             {"source": "anomaly_detection", "target": "risk_assessment"},
                             {"source": "risk_assessment", "target": "preservation_strategy"},
@@ -618,20 +630,20 @@ SCENARIOS: List[Scenario] = [
                 "id": "task_analysis",
                 "label": "🚛 任务解析：向X位置运输4车食品和水",
                 "status": "completed",
-                "summary": "解析车队规模为4车，货物为食品与水，目标为安全高效抵达位置X，并在越野环境下保持队形稳定与协同顺畅。",
+                "summary": "解析4车食品与水运往X的任务，明确需要在越野环境下保持编队稳定、按时抵达并兼顾效率。",
                 "children": [
                     {
                         "id": "formation_planning",
-                        "label": "行进编队规划",
+                        "label": "🛤️ 行进编队规划：单列/并行自适应",
                         "status": "completed",
-                        "summary": "根据道路宽度与安全间距选择合适的单列或部分并行队列，确定车序与间距。",
+                        "summary": "基于道路宽度、安全距离与通行风险，选择单列或局部并行队列，输出车序与间距，为后续协同动作提供约束。",
                         "children": []
                     },
                     {
                         "id": "coordination_management",
-                        "label": "协同动作管理",
+                        "label": "🤝 协同动作管理：动态调整队形与顺序",
                         "status": "active",
-                        "summary": "针对掉头、超车、避障与通过狭窄路段等场景规划协同动作顺序与通信策略。",
+                        "summary": "针对掉头、避障、狭窄路段等场景，动态调整队形与行进顺序，规划通信同步与执行顺序以优化整体效率。",
                         "children": [],
                         "control_meta": {
                             "control_type": "decentralized_rl",
@@ -646,33 +658,36 @@ SCENARIOS: List[Scenario] = [
             "node_insights": {
                 "task_analysis": {
                     "title": "任务解析",
-                    "summary": "将“向X位置运输4车食品和水”解析为多车协同行进任务，重点关注队形稳定与效率优化。",
+                    "summary": "将“向X位置运输4车食品和水”解析为多车协同行进任务，需平衡安全距离、通过效率与实时路况适应。",
                     "key_points": [
                         "识别车队规模为4车，货物类型为食品与水",
-                        "结合路况推断是否存在狭窄路段与会车场景",
-                        "提出“既要保障安全距离，又要控制整体用时”的调度目标"
+                        "结合路况推断狭窄路段/会车/障碍等场景，形成编队约束",
+                        "提出“保障安全距离 + 动态调整队形 + 控制整体用时”的调度目标"
                     ],
                     "knowledge_trace": "任务文本解析 → 车队规模与货物属性识别 → 协同与效率目标定义。"
                 },
                 "formation_planning": {
                     "title": "行进编队规划",
-                    "summary": "根据道路宽度与安全间距要求，确定4车队列采用单列或局部并行的编队方式。",
+                    "summary": "根据道路宽度、安全间距与风险等级，选择单列或局部并行，生成初始车序与间距，供执行阶段动态调整。",
                     "key_points": [
                         "估算道路宽度与会车可能性，判断是否允许并行队列",
-                        "设计前后纵向间距以兼顾制动距离与通信链路稳定性",
-                        "给出初始车序安排，如前车装载较轻、具备更强侦察能力"
+                        "设计纵向间距以兼顾制动距离与通信链路稳定性",
+                        "初始车序可倾向将侦察/较轻载车辆置前，便于探路与避障",
+                        "为“掉头/整体倒置/让行”动作预留可重排的编号与槽位"
                     ],
                     "knowledge_trace": "道路与安全约束 → 编队方式筛选 → 车序与间距配置。"
                 },
                 "coordination_management": {
                     "title": "协同动作管理",
-                    "summary": "为4车队列规划在掉头、避障、通过狭窄路段等典型场景下的协同动作顺序与通信同步方案。",
+                    "summary": "点击后展示推理图谱：在掉头、通过狭窄路段或需要整体倒置时，动态调整队形与行进顺序，定义通信同步与执行顺序以优化效率。",
                     "key_points": [
-                        "识别需要协同的动作类型：依序掉头、整体倒置、紧急避让等，并为每辆车建立本地决策规则",
-                        "各车辆基于自身局部感知与历史轨迹维护本地策略/值函数，通过车间通信交换关键信息",
-                        "在分布式一致性更新后形成协同动作策略，并按既定顺序执行与状态同步"
+                        "识别协同行为：依序掉头、整体倒置、让行/避障、通过狭窄路段",
+                        "动态队形：依据道路宽度/障碍实时选择单列或并行，必要时整体倒置车序",
+                        "通信同步：各车共享局部感知与关键状态，保持一致的动作顺序与速度指令",
+                        "执行顺序：按“感知→决策→广播→协同行动→状态同步”闭环运行，保证平滑过渡",
+                        "效率目标：在安全约束下最小化通行时间与停顿次数"
                     ],
-                    "knowledge_trace": "编队规划结果 → 各车本地策略与轨迹收集 → 分布式一致性聚合与去中心化策略更新 → 形成协同动作策略并执行与同步。",
+                    "knowledge_trace": "编队规划结果 → 感知道路宽度/障碍 → 选择单列或并行队形 → 生成协同行动顺序（掉头/倒置/让行） → 执行与状态同步。",
                     "knowledge_graph": {
                         "nodes": [
                             {"id": "formation_planning", "label": "编队规划结果", "type": "input"},
@@ -3650,7 +3665,217 @@ SCENARIOS: List[Scenario] = [
             "□ 所有 summary 包含具体数值而非空泛描述\n"
             "□ 所有 key_points 包含分析过程或具体参数"
         ),
-        example_output=None,
+        example_output={
+            "default_focus": "outbound_strategy",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "📦 任务分析：急救包10个，绷带20卷，注射器40支",
+                "status": "completed",
+                "summary": "解析出库需求：为医疗小组准备急救包10个、绷带20卷、注射器40支，需在1小时内完成出库与交接。",
+                "children": [
+                    {
+                        "id": "task_requirement_parsing",
+                        "label": "📑 任务需求解析：3类物资，70件",
+                        "status": "completed",
+                        "summary": "识别物资类型3类，共70件，并确认急救包优先级最高。",
+                        "children": [
+                            {
+                                "id": "material_type_identification",
+                                "label": "物资类型识别：急救包/绷带/注射器",
+                                "status": "completed",
+                                "summary": "解析文本得到3类物资：急救包、绷带、注射器。",
+                                "children": []
+                            },
+                            {
+                                "id": "quantity_requirement_analysis",
+                                "label": "数量需求分析：10/20/40",
+                                "status": "completed",
+                                "summary": "确定需求数量：急救包10个、绷带20卷、注射器40支。",
+                                "children": []
+                            },
+                            {
+                                "id": "priority_analysis",
+                                "label": "优先级分析：急救包最高",
+                                "status": "completed",
+                                "summary": "基于任务紧急性，将急救包设为最高优先级，其次绷带，再次注射器。",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "id": "inventory_matching",
+                        "label": "✅ 库存匹配：急救包12，绷带30，注射器80",
+                        "status": "completed",
+                        "summary": "库存查询结果：急救包可用12个，绷带30卷，注射器80支，满足需求并可挑选批次。",
+                        "children": []
+                    },
+                    {
+                        "id": "outbound_strategy",
+                        "label": "✅ 出库策略：保质期优先+FIFO",
+                        "status": "active",
+                        "summary": "采用保质期优先结合先进先出，选择最早到期批次；急救包批次A(5个,30天)与批次B(5个,45天)，绷带批次C(20卷,60天)，注射器批次D(40支,90天)。",
+                        "children": [
+                            {
+                                "id": "fifo_strategy",
+                                "label": "FIFO策略：按入库时间排序",
+                                "status": "completed",
+                                "summary": "以入库时间从早到晚排序，确保先入先出。",
+                                "children": []
+                            },
+                            {
+                                "id": "expiry_priority_strategy",
+                                "label": "保质期优先：先用30/45天批次",
+                                "status": "completed",
+                                "summary": "优先提取剩余保质期30天与45天的急救包，降低过期风险。",
+                                "children": []
+                            },
+                            {
+                                "id": "batch_selection",
+                                "label": "批次选择：A5+B5，C20，D40",
+                                "status": "completed",
+                                "summary": "选择急救包批次A 5个+B 5个，绷带批次C 20卷，注射器批次D 40支。",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "id": "loading_and_handover",
+                        "label": "🚚 装载与交接：生成移交单并推荐厢式车",
+                        "status": "pending",
+                        "summary": "生成出库与移交记录，推荐1辆小型厢式车进行运输，附上批次与数量明细。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务分析与解析",
+                    "summary": "对“为医疗小组准备急救包10个、绷带20卷、注射器40支”进行结构化解析，时限1小时。",
+                    "key_points": [
+                        "抽取物资类型3类：急救包、绷带、注射器",
+                        "数量需求：10/20/40，合计70件",
+                        "时限要求1小时内完成出库并交接"
+                    ],
+                    "knowledge_trace": "任务文本 → 物资与数量抽取 → 时限确认 → 形成出库需求。"
+                },
+                "task_requirement_parsing": {
+                    "title": "任务需求解析",
+                    "summary": "解析得到3类物资共70件，并标注急救包最高优先级。",
+                    "key_points": [
+                        "物资类型识别：急救包/绷带/注射器",
+                        "数量需求：10/20/40",
+                        "优先级：急救包 > 绷带 > 注射器"
+                    ],
+                    "knowledge_trace": "任务要素提取 → 数量与优先级标注 → 输出需求清单。"
+                },
+                "material_type_identification": {
+                    "title": "物资类型识别",
+                    "summary": "确定需出库物资类型为急救包、绷带、注射器三类。",
+                    "key_points": [
+                        "从描述中抽取“急救包”“绷带”“注射器”",
+                        "归并为3个类别便于后续匹配",
+                        "为库存匹配提供类型索引"
+                    ],
+                    "knowledge_trace": "文本解析 → 实体抽取 → 形成物资类型列表。"
+                },
+                "quantity_requirement_analysis": {
+                    "title": "数量需求分析",
+                    "summary": "需求数量：急救包10个、绷带20卷、注射器40支。",
+                    "key_points": [
+                        "读取需求量：10/20/40",
+                        "汇总总件数70件便于容量核验",
+                        "为库存差额和批次选择做输入"
+                    ],
+                    "knowledge_trace": "任务需求 → 数量提取 → 形成数量矩阵。"
+                },
+                "priority_analysis": {
+                    "title": "优先级分析",
+                    "summary": "急救包最高，其次绷带，再次注射器，依据任务紧急性排序。",
+                    "key_points": [
+                        "按救治关键度排序：急救包 > 绷带 > 注射器",
+                        "优先级用于冲突或不足时的选择依据",
+                        "与批次选择的保质期策略组合使用"
+                    ],
+                    "knowledge_trace": "任务紧急性判断 → 物资关键度排序 → 输出优先级表。"
+                },
+                "inventory_matching": {
+                    "title": "库存匹配",
+                    "summary": "库存结果：急救包12个(批次A/B)，绷带30卷(批次C)，注射器80支(批次D)，满足需求。",
+                    "key_points": [
+                        "查询库存：急救包A(5个,30天), B(7个,45天)",
+                        "绷带C(30卷,60天)，注射器D(80支,90天)",
+                        "可覆盖需求量并支持保质期优先"
+                    ],
+                    "knowledge_trace": "库存查询 → 按类型汇总数量与批次 → 输出可用清单。"
+                },
+                "outbound_strategy": {
+                    "title": "出库策略",
+                    "summary": "采用保质期优先+FIFO，选择急救包A 5个+B 5个，绷带C 20卷，注射器D 40支。",
+                    "key_points": [
+                        "策略组合：保质期优先 + 先进先出",
+                        "急救包：A(30天)5个 + B(45天)5个满足10个需求",
+                        "绷带：C(60天)提取20/30卷；注射器：D(90天)提取40/80支",
+                        "留存余量便于后续任务：A余0，B余2，C余10，D余40"
+                    ],
+                    "knowledge_trace": "需求清单 → 库存批次 → 保质期与FIFO排序 → 批次锁定并生成出库方案。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "requirement_parsing", "label": "任务需求解析(急救包10,绷带20,注射器40)", "type": "input"},
+                            {"id": "inventory_matching", "label": "库存匹配(急救包12,绷带30,注射器80)", "type": "process"},
+                            {"id": "strategy_selection", "label": "出库策略选择(保质期优先+FIFO)", "type": "decision"},
+                            {"id": "batch_determination", "label": "批次确定(A5,B5,C20,D40)", "type": "process"},
+                            {"id": "outbound_plan", "label": "出库方案生成(70件,1小时内交付)", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "requirement_parsing", "target": "inventory_matching"},
+                            {"source": "inventory_matching", "target": "strategy_selection"},
+                            {"source": "strategy_selection", "target": "batch_determination"},
+                            {"source": "batch_determination", "target": "outbound_plan"}
+                        ]
+                    }
+                },
+                "fifo_strategy": {
+                    "title": "先进先出策略",
+                    "summary": "批次按入库时间排序，先出库A(最早)再B。",
+                    "key_points": [
+                        "入库时间：A最早，B次之",
+                        "优先取A 5个，再取B满足剩余需求",
+                        "避免后入库批次先出，减少库存倒挂"
+                    ],
+                    "knowledge_trace": "入库时间排序 → 先取早批次 → 输出提取顺序。"
+                },
+                "expiry_priority_strategy": {
+                    "title": "保质期优先策略",
+                    "summary": "优先选择剩余保质期短的批次，降低过期风险。",
+                    "key_points": [
+                        "急救包：A(30天)优先于B(45天)",
+                        "绷带/注射器当前批次剩余期均充足，无需拆分",
+                        "策略与FIFO一致性校验通过"
+                    ],
+                    "knowledge_trace": "保质期排序 → 短期批次优先 → 输出批次优先级。"
+                },
+                "batch_selection": {
+                    "title": "批次选择",
+                    "summary": "锁定批次：急救包A5+B5，绷带C20，注射器D40，满足需求量。",
+                    "key_points": [
+                        "按需求锁定数量：10/20/40",
+                        "批次映射：A5+B5，C20，D40",
+                        "记录批次号与剩余量方便追溯"
+                    ],
+                    "knowledge_trace": "策略结果 → 批次数量映射 → 生成批次清单。"
+                },
+                "loading_and_handover": {
+                    "title": "装载与交接",
+                    "summary": "生成出库移交单，记录批次A5/B5/C20/D40，推荐1辆小型厢式车运输。",
+                    "key_points": [
+                        "创建移交记录含批次与数量明细",
+                        "绑定运输方式：小型厢式车一次装载70件",
+                        "交接时间窗口：1小时内完成"
+                    ],
+                    "knowledge_trace": "批次清单 → 装载与移交单生成 → 运输车辆推荐 → 下发执行。"
+                }
+            }
+        },
     ),
     # 24. 资源维护
     Scenario(
@@ -3705,10 +3930,219 @@ SCENARIOS: List[Scenario] = [
             "□ 所有 summary 包含具体数值而非空泛描述\n"
             "□ 所有 key_points 包含分析过程或具体参数"
         ),
-        example_output=None,
+        example_output={
+            "default_focus": "maintenance_scheduling_strategy",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "🔧 任务分析：无人机电池/医用设备例行维护",
+                "status": "completed",
+                "summary": "解析任务：对无人机电池与医用设备开展例行维护，时间窗口48小时，需区分检测/校准/更换。",
+                "children": [
+                    {
+                        "id": "resource_status_parsing",
+                        "label": "📊 资源状态解析：电池500h/损耗30%，设备使用800h",
+                        "status": "completed",
+                        "summary": "统计无人机电池累计使用500小时，健康度70%；医用设备使用800小时，校准周期1000小时。",
+                        "children": [
+                            {
+                                "id": "usage_duration_analysis",
+                                "label": "使用时长分析：电池500h，设备800h",
+                                "status": "completed",
+                                "summary": "记录电池使用500小时，医用设备使用800小时。",
+                                "children": []
+                            },
+                            {
+                                "id": "wear_degree_analysis",
+                                "label": "损耗程度分析：电池损耗30%",
+                                "status": "completed",
+                                "summary": "电池健康度约70%，预计剩余循环200次；设备机械部件轻微磨损。",
+                                "children": []
+                            },
+                            {
+                                "id": "expiry_analysis",
+                                "label": "有效期分析：电池寿命1000h，设备校准1000h",
+                                "status": "completed",
+                                "summary": "电池设计寿命1000小时，现已用500小时；设备校准周期1000小时，剩余200小时缓冲。",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "id": "maintenance_requirement_judgment",
+                        "label": "✅ 维护需求判断：电池需检测，设备需校准",
+                        "status": "completed",
+                        "summary": "电池健康度70%需做容量检测与均衡；设备距校准阈值200小时，建议提前校准。",
+                        "children": []
+                    },
+                    {
+                        "id": "maintenance_scheduling_strategy",
+                        "label": "✅ 维护调度策略：电池检测优先，设备校准次之",
+                        "status": "active",
+                        "summary": "排序优先级：1) 电池容量检测与均衡；2) 医用设备校准；3) 电池易损件检查。48小时内完成并预留备份资源。",
+                        "children": [
+                            {
+                                "id": "priority_sorting",
+                                "label": "优先级排序：电池检测>设备校准>易损件更换",
+                                "status": "completed",
+                                "summary": "按剩余寿命与任务风险排序，电池检测最先执行。",
+                                "children": []
+                            },
+                            {
+                                "id": "resource_replacement_plan",
+                                "label": "资源替换方案：备用电池2块，设备备用1套",
+                                "status": "completed",
+                                "summary": "准备2块备用电池、1套备用设备以防检测或校准失败。",
+                                "children": []
+                            },
+                            {
+                                "id": "schedule_arrangement",
+                                "label": "调度安排：T+4h开始，48h内完成",
+                                "status": "completed",
+                                "summary": "T+4h启动电池检测，T+12h设备校准，T+36h完成复检，T+48h收尾。",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "id": "maintenance_record_update",
+                        "label": "🗂️ 维护记录更新：同步库存系统",
+                        "status": "pending",
+                        "summary": "生成维护日志，记录检测/校准结果与替换批次，同步至库存与任务派发系统。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务分析与解析",
+                    "summary": "任务范围：无人机电池与医用设备；时间窗48小时；维护类型含检测/校准/更换。",
+                    "key_points": [
+                        "资源范围：电池×若干，医用设备×1套",
+                        "时间要求：48小时内闭环",
+                        "需要区分检测、校准与易损件检查"
+                    ],
+                    "knowledge_trace": "任务描述解析 → 资源与时间窗确认 → 维护类型清单输出。"
+                },
+                "resource_status_parsing": {
+                    "title": "资源状态解析",
+                    "summary": "电池使用500h健康度70%，设备使用800h距校准阈值1000h还差200h。",
+                    "key_points": [
+                        "电池：累计500h/设计1000h，健康度70%",
+                        "设备：累计800h，校准周期1000h",
+                        "为需求判断提供寿命与健康度基线"
+                    ],
+                    "knowledge_trace": "使用时长/寿命数据 → 健康度评估 → 输出状态基线。"
+                },
+                "usage_duration_analysis": {
+                    "title": "使用时长分析",
+                    "summary": "电池使用500h，设备800h，距离寿命/校准阈值剩余500h/200h。",
+                    "key_points": [
+                        "电池：500/1000h，剩余500h",
+                        "设备：800/1000h，剩余200h至校准",
+                        "时长接近阈值需提前调度"
+                    ],
+                    "knowledge_trace": "时长数据 → 与阈值比对 → 输出剩余裕度。"
+                },
+                "wear_degree_analysis": {
+                    "title": "损耗程度分析",
+                    "summary": "电池健康度70%（损耗30%），设备机械磨损轻微。",
+                    "key_points": [
+                        "电池SOH≈70%，需容量检测与均衡",
+                        "损耗水平提示更换风险，中期需备份",
+                        "设备无显著磨损，但随校准同步检查"
+                    ],
+                    "knowledge_trace": "传感/检测数据 → 损耗估计 → 输出健康评级。"
+                },
+                "expiry_analysis": {
+                    "title": "有效期分析",
+                    "summary": "电池寿命1000h已用500h；设备校准周期1000h已用800h，需200h内执行校准。",
+                    "key_points": [
+                        "电池剩余寿命50%，需进入加强检测阶段",
+                        "设备距校准阈值200h，宜提前安排",
+                        "为调度提供时间优先级依据"
+                    ],
+                    "knowledge_trace": "设计寿命/周期 → 剩余寿命计算 → 提醒即将到期。"
+                },
+                "maintenance_requirement_judgment": {
+                    "title": "维护需求判断",
+                    "summary": "电池需做容量检测与均衡；设备需提前校准；电池易损件需检查。",
+                    "key_points": [
+                        "SOH 70%触发检测与均衡流程",
+                        "设备距阈值200h，安排校准",
+                        "同时检查电池连接件/散热片等易损件"
+                    ],
+                    "knowledge_trace": "状态基线 → 阈值规则 → 判定检测/校准/更换需求。"
+                },
+                "maintenance_scheduling_strategy": {
+                    "title": "维护调度策略",
+                    "summary": "优先执行电池检测与均衡，其次设备校准；准备2块备用电池与1套备用设备，48小时内完成并复检。",
+                    "key_points": [
+                        "优先级：电池检测(高) > 设备校准(中) > 易损件检查(中)",
+                        "资源替换：备用电池2块，设备备用1套",
+                        "时间表：T+4h检测，T+12h校准，T+36h复检，T+48h收尾"
+                    ],
+                    "knowledge_trace": "状态与需求 → 优先级排序 → 备份与替换准备 → 排期落表 → 输出维护方案。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "status_parsing", "label": "资源状态解析(电池500h/70%,设备800h)", "type": "input"},
+                            {"id": "requirement_judgment", "label": "维护需求判断(检测/校准/检查)", "type": "process"},
+                            {"id": "priority_sorting", "label": "优先级排序(电池检测>设备校准)", "type": "decision"},
+                            {"id": "replacement_plan", "label": "资源替换方案(备用电池2,设备1)", "type": "process"},
+                            {"id": "schedule_arrangement", "label": "调度安排(48h内完成)", "type": "process"},
+                            {"id": "maintenance_plan", "label": "维护方案生成(含复检与记录)", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "status_parsing", "target": "requirement_judgment"},
+                            {"source": "requirement_judgment", "target": "priority_sorting"},
+                            {"source": "priority_sorting", "target": "replacement_plan"},
+                            {"source": "replacement_plan", "target": "schedule_arrangement"},
+                            {"source": "schedule_arrangement", "target": "maintenance_plan"}
+                        ]
+                    }
+                },
+                "priority_sorting": {
+                    "title": "优先级排序",
+                    "summary": "电池检测与均衡置于最高优先级，其次设备校准，再次易损件检查。",
+                    "key_points": [
+                        "依据寿命余量与任务影响排序：电池检测 > 设备校准 > 易损件检查",
+                        "高优先项在前12小时完成",
+                        "降低关键资源失效风险"
+                    ],
+                    "knowledge_trace": "需求列表 → 风险/剩余寿命评估 → 输出排序结果。"
+                },
+                "resource_replacement_plan": {
+                    "title": "资源替换方案",
+                    "summary": "准备2块备用电池和1套备用设备，若检测或校准失败可即时替换。",
+                    "key_points": [
+                        "备用电池2块覆盖一架次调度需求",
+                        "备用设备1套用于校准失败或停机备援",
+                        "预留更换记录字段供追溯"
+                    ],
+                    "knowledge_trace": "优先级结果 → 备份需求评估 → 生成替换与备份配置。"
+                },
+                "schedule_arrangement": {
+                    "title": "调度安排",
+                    "summary": "T+4h启动电池检测，T+12h设备校准，T+36h复检，T+48h完成记录更新。",
+                    "key_points": [
+                        "时间表：4h/12h/36h/48h节点",
+                        "确保在主任务前完成校准与检测",
+                        "复检结果写回记录以闭环"
+                    ],
+                    "knowledge_trace": "优先级与资源约束 → 排期与时间节点 → 下发执行计划。"
+                },
+                "maintenance_record_update": {
+                    "title": "维护记录更新",
+                    "summary": "将检测/校准结果与替换批次写入日志，并同步库存系统与任务派发系统。",
+                    "key_points": [
+                        "记录批次、SOH结果、校准时间",
+                        "同步库存与派发系统保持一致",
+                        "形成可审计的维护链路"
+                    ],
+                    "knowledge_trace": "执行结果收集 → 记录与同步 → 状态闭环。"
+                }
+            }
+        },
     ),
-
-
 ]
 
 
