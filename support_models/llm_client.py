@@ -22,8 +22,8 @@ def _get_client() -> OpenAI:
     if _client is None:
         # base_url = os.environ.get("GLM_BASE_URL")
         # api_key = os.environ.get("GLM_API_KEY")
-        base_url = os.environ.get("ARK_BASE_URL")
-        api_key = os.environ.get("ARK_API_KEY")
+        base_url = os.environ.get("BASE_URL")
+        api_key = os.environ.get("API_KEY")
 
         if not base_url or not api_key:
             raise RuntimeError(
