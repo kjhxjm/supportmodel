@@ -24,7 +24,13 @@ python app.py
 
 # 访问应用
 # http://localhost:5000
+
+gunicorn -w 2 -b 0.0.0.0:5000 app:app --daemon
+
 ```
+
+
+
 
 #### （可选）启用大模型生成蓝图
 

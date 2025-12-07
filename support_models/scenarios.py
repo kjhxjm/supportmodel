@@ -1207,7 +1207,7 @@ SCENARIOS: List[Scenario] = [
         id="equipment_auto_loading",  # 7. 自主装卸控制
         model_name="设备投放",
         name="自主装卸控制",
-        example_input="将设备Y通过无人车运输至X点，并由机械臂自主卸载",
+        example_input="将设备Y通过无人车投放至X点，并由机械臂自主卸载",
         reasoning_chain="装卸需求解析（重量、尺寸、抓取方式）→ 动作规划（机械臂抓取路径、姿态调整、力控策略）→ 安全检测（防倾倒、防滑落、力反馈监测）→ 装卸完成确认（识别设备是否已稳定装载/完成卸载）",
         prompt=(
             "【设备投放-自主装卸控制专项要求】\n"
