@@ -246,15 +246,21 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "任务与路况要素 → 车辆类型筛选 → 数量与冗余计算 → 装载比例设计 → 形成最终车队编成方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "task_parsing", "label": "任务解析(位置X, 资源Y, 2小时, 道路损毁风险)", "type": "input"},
-                            {"id": "vehicle_matching", "label": "车辆匹配(中型越野无人车)", "type": "process"},
-                            {"id": "quantity_calc", "label": "数量计算(2辆, 含20%冗余)", "type": "process"},
-                            {"id": "loading_scheme", "label": "装载方案(1车60%,1车40%)", "type": "decision"},
-                            {"id": "fleet_config", "label": "最终配置(2辆中型越野无人车)", "type": "output"}
+                            {"id": "task_parsing",
+                                "label": "任务解析(位置X, 资源Y, 2小时, 道路损毁风险)", "type": "input"},
+                            {"id": "vehicle_matching",
+                                "label": "车辆匹配(中型越野无人车)", "type": "process"},
+                            {"id": "quantity_calc",
+                                "label": "数量计算(2辆, 含20%冗余)", "type": "process"},
+                            {"id": "loading_scheme",
+                                "label": "装载方案(1车60%,1车40%)", "type": "decision"},
+                            {"id": "fleet_config",
+                                "label": "最终配置(2辆中型越野无人车)", "type": "output"}
                         ],
                         "edges": [
                             {"source": "task_parsing", "target": "quantity_calc"},
-                            {"source": "vehicle_matching", "target": "quantity_calc"},
+                            {"source": "vehicle_matching",
+                                "target": "quantity_calc"},
                             {"source": "quantity_calc", "target": "loading_scheme"},
                             {"source": "loading_scheme", "target": "fleet_config"}
                         ]
@@ -469,15 +475,20 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_graph": {
                         "nodes": [
                             {"id": "initial_route", "label": "初始路径", "type": "input"},
-                            {"id": "anomaly_detection", "label": "异常感知结果", "type": "input"},
-                            {"id": "env_assessment", "label": "环境评估与路网更新", "type": "process"},
-                            {"id": "route_optimization", "label": "路径优化决策", "type": "decision"},
+                            {"id": "anomaly_detection",
+                                "label": "异常感知结果", "type": "input"},
+                            {"id": "env_assessment",
+                                "label": "环境评估与路网更新", "type": "process"},
+                            {"id": "route_optimization",
+                                "label": "路径优化决策", "type": "decision"},
                             {"id": "new_route", "label": "新路径生成", "type": "output"}
                         ],
                         "edges": [
                             {"source": "initial_route", "target": "env_assessment"},
-                            {"source": "anomaly_detection", "target": "env_assessment"},
-                            {"source": "env_assessment", "target": "route_optimization"},
+                            {"source": "anomaly_detection",
+                                "target": "env_assessment"},
+                            {"source": "env_assessment",
+                                "target": "route_optimization"},
                             {"source": "route_optimization", "target": "new_route"}
                         ]
                     }
@@ -608,22 +619,35 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "监控需求解析 → 传感器数据融合 → 状态判别与分级 → 异常响应策略选择 → 执行处理动作 → 告警与日志生成 → 同步至指挥端 → 闭环验证。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "monitoring_requirements", "label": "监控需求(车辆健康,货物状态,位置能耗)", "type": "input"},
-                            {"id": "sensor_fusion", "label": "传感器融合(温度,GPS,IMU,胎压,能耗)", "type": "process"},
-                            {"id": "status_judgment", "label": "状态判别(温度,振动,胎压,路线,能量)", "type": "process"},
-                            {"id": "anomaly_classification", "label": "异常分级(轻度/中度/严重)", "type": "process"},
-                            {"id": "response_strategy", "label": "响应策略(提频/降速/改道/切换/停车)", "type": "decision"},
-                            {"id": "alert_logging", "label": "告警与记录(实时推送,执行日志)", "type": "output"},
-                            {"id": "command_sync", "label": "指挥端同步(状态+告警+日志)", "type": "output"}
+                            {"id": "monitoring_requirements",
+                                "label": "监控需求(车辆健康,货物状态,位置能耗)", "type": "input"},
+                            {"id": "sensor_fusion",
+                                "label": "传感器融合(温度,GPS,IMU,胎压,能耗)", "type": "process"},
+                            {"id": "status_judgment",
+                                "label": "状态判别(温度,振动,胎压,路线,能量)", "type": "process"},
+                            {"id": "anomaly_classification",
+                                "label": "异常分级(轻度/中度/严重)", "type": "process"},
+                            {"id": "response_strategy",
+                                "label": "响应策略(提频/降速/改道/切换/停车)", "type": "decision"},
+                            {"id": "alert_logging",
+                                "label": "告警与记录(实时推送,执行日志)", "type": "output"},
+                            {"id": "command_sync",
+                                "label": "指挥端同步(状态+告警+日志)", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "monitoring_requirements", "target": "sensor_fusion"},
-                            {"source": "sensor_fusion", "target": "status_judgment"},
-                            {"source": "status_judgment", "target": "anomaly_classification"},
-                            {"source": "anomaly_classification", "target": "response_strategy"},
-                            {"source": "response_strategy", "target": "alert_logging"},
+                            {"source": "monitoring_requirements",
+                                "target": "sensor_fusion"},
+                            {"source": "sensor_fusion",
+                                "target": "status_judgment"},
+                            {"source": "status_judgment",
+                                "target": "anomaly_classification"},
+                            {"source": "anomaly_classification",
+                                "target": "response_strategy"},
+                            {"source": "response_strategy",
+                                "target": "alert_logging"},
                             {"source": "alert_logging", "target": "command_sync"},
-                            {"source": "response_strategy", "target": "sensor_fusion"}
+                            {"source": "response_strategy",
+                                "target": "sensor_fusion"}
                         ]
                     }
                 }
@@ -714,24 +738,40 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "编队规划结果 → 感知道路宽度/障碍 → 选择单列或并行队形 → 生成协同行动顺序（掉头/倒置/让行） → 执行与状态同步。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "formation_planning", "label": "编队规划结果", "type": "input"},
-                            {"id": "local_policy_agents", "label": "各车本地策略 π_i / Q_i", "type": "process"},
-                            {"id": "local_experience", "label": "本地轨迹与经验回放 D_i", "type": "process"},
-                            {"id": "consensus_weight", "label": "分布式一致性权重估计 ω(τ)", "type": "process"},
-                            {"id": "decentralized_update", "label": "去中心化策略更新(Actor–Critic)", "type": "process"},
-                            {"id": "coordination_strategy", "label": "协同动作策略", "type": "process"},
-                            {"id": "execution_sequence", "label": "协同行动执行顺序", "type": "decision"},
-                            {"id": "status_sync", "label": "车队状态同步与反馈", "type": "output"}
+                            {"id": "formation_planning",
+                                "label": "编队规划结果", "type": "input"},
+                            {"id": "local_policy_agents",
+                                "label": "各车本地策略 π_i / Q_i", "type": "process"},
+                            {"id": "local_experience",
+                                "label": "本地轨迹与经验回放 D_i", "type": "process"},
+                            {"id": "consensus_weight",
+                                "label": "分布式一致性权重估计 ω(τ)", "type": "process"},
+                            {"id": "decentralized_update",
+                                "label": "去中心化策略更新(Actor–Critic)", "type": "process"},
+                            {"id": "coordination_strategy",
+                                "label": "协同动作策略", "type": "process"},
+                            {"id": "execution_sequence",
+                                "label": "协同行动执行顺序", "type": "decision"},
+                            {"id": "status_sync",
+                                "label": "车队状态同步与反馈", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "formation_planning", "target": "local_policy_agents"},
-                            {"source": "local_policy_agents", "target": "local_experience"},
-                            {"source": "local_experience", "target": "consensus_weight"},
-                            {"source": "consensus_weight", "target": "decentralized_update"},
-                            {"source": "decentralized_update", "target": "coordination_strategy"},
-                            {"source": "coordination_strategy", "target": "execution_sequence"},
-                            {"source": "execution_sequence", "target": "status_sync"},
-                            {"source": "status_sync", "target": "local_policy_agents"}
+                            {"source": "formation_planning",
+                                "target": "local_policy_agents"},
+                            {"source": "local_policy_agents",
+                                "target": "local_experience"},
+                            {"source": "local_experience",
+                                "target": "consensus_weight"},
+                            {"source": "consensus_weight",
+                                "target": "decentralized_update"},
+                            {"source": "decentralized_update",
+                                "target": "coordination_strategy"},
+                            {"source": "coordination_strategy",
+                                "target": "execution_sequence"},
+                            {"source": "execution_sequence",
+                                "target": "status_sync"},
+                            {"source": "status_sync",
+                                "target": "local_policy_agents"}
                         ]
                     }
                 }
@@ -854,17 +894,24 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "风险等级 + 车辆能力 → 路段级策略（通过/减速/绕行） → 汇总为全程通行方案与任务可行性结论。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "terrain_obstacle", "label": "地形与障碍抽取结果", "type": "input"},
-                            {"id": "risk_level", "label": "通行风险判定(等级+系数)", "type": "process"},
-                            {"id": "vehicle_capability", "label": "车辆能力匹配", "type": "process"},
-                            {"id": "pass_strategy", "label": "通行/绕行策略生成", "type": "decision"},
-                            {"id": "feasibility_conclusion", "label": "任务可行性结论", "type": "output"}
+                            {"id": "terrain_obstacle",
+                                "label": "地形与障碍抽取结果", "type": "input"},
+                            {"id": "risk_level",
+                                "label": "通行风险判定(等级+系数)", "type": "process"},
+                            {"id": "vehicle_capability",
+                                "label": "车辆能力匹配", "type": "process"},
+                            {"id": "pass_strategy", "label": "通行/绕行策略生成",
+                                "type": "decision"},
+                            {"id": "feasibility_conclusion",
+                                "label": "任务可行性结论", "type": "output"}
                         ],
                         "edges": [
                             {"source": "terrain_obstacle", "target": "risk_level"},
                             {"source": "risk_level", "target": "vehicle_capability"},
-                            {"source": "vehicle_capability", "target": "pass_strategy"},
-                            {"source": "pass_strategy", "target": "feasibility_conclusion"}
+                            {"source": "vehicle_capability",
+                                "target": "pass_strategy"},
+                            {"source": "pass_strategy",
+                                "target": "feasibility_conclusion"}
                         ]
                     }
                 }
@@ -983,16 +1030,23 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "load_slope_profile + unit_energy + total_travel_time → 任务总能耗与耗时 → 与能源容量对比 → 生成补能/补给计划。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "load_slope_profile", "label": "载重与坡度解析结果", "type": "input"},
-                            {"id": "unit_energy", "label": "单位距离能耗估计", "type": "process"},
-                            {"id": "travel_time", "label": "行程时间预测", "type": "process"},
-                            {"id": "total_energy", "label": "总能耗推理", "type": "process"},
-                            {"id": "resupply_plan", "label": "补能与补给建议", "type": "output"}
+                            {"id": "load_slope_profile",
+                                "label": "载重与坡度解析结果", "type": "input"},
+                            {"id": "unit_energy", "label": "单位距离能耗估计",
+                                "type": "process"},
+                            {"id": "travel_time", "label": "行程时间预测",
+                                "type": "process"},
+                            {"id": "total_energy", "label": "总能耗推理",
+                                "type": "process"},
+                            {"id": "resupply_plan",
+                                "label": "补能与补给建议", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "load_slope_profile", "target": "unit_energy"},
+                            {"source": "load_slope_profile",
+                                "target": "unit_energy"},
                             {"source": "unit_energy", "target": "total_energy"},
-                            {"source": "load_slope_profile", "target": "travel_time"},
+                            {"source": "load_slope_profile",
+                                "target": "travel_time"},
                             {"source": "total_energy", "target": "resupply_plan"},
                             {"source": "travel_time", "target": "resupply_plan"}
                         ]
@@ -1061,7 +1115,7 @@ SCENARIOS: List[Scenario] = [
                                 "label": "装载顺序",
                                 "status": "completed",
                                 "summary": "重物在下轻物在上，冷链物资需优先装载并预冷，食物与水按密封防潮要求装载。",
-                        "children": []
+                                "children": []
                             },
                             {
                                 "id": "fixing_method",
@@ -1097,7 +1151,7 @@ SCENARIOS: List[Scenario] = [
                                 "label": "🐢 低速稳态模式",
                                 "status": "completed",
                                 "summary": "当坡度>15°或路面附着系数<0.4时，自动切换至低速档（10km/h），增加牵引力与稳定性，保护冷链货物免受剧烈颠簸。",
-                        "children": []
+                                "children": []
                             },
                             {
                                 "id": "slope_sensitive_control",
@@ -1200,7 +1254,7 @@ SCENARIOS: List[Scenario] = [
                                 "label": "🚁 前置侦察无人机",
                                 "status": "completed",
                                 "summary": "2架小型旋翼无人机提前1km探测路况，飞行高度80m，可识别塌方、积水、倾倒树木等障碍，实时回传视频与地形数据。",
-                        "children": []
+                                "children": []
                             },
                             {
                                 "id": "backup_routes",
@@ -1229,7 +1283,7 @@ SCENARIOS: List[Scenario] = [
                                 "label": "📋 运输批次",
                                 "status": "completed",
                                 "summary": "本次任务为单批次运输：4辆车同时出发，2辆冷链车+2辆普通车编队行进，单批次总载重约110kg。",
-                        "children": []
+                                "children": []
                             },
                             {
                                 "id": "convoy_interval",
@@ -1337,7 +1391,7 @@ SCENARIOS: List[Scenario] = [
                                 "label": "交接流程",
                                 "status": "pending",
                                 "summary": "按货物清单逐项清点，使用扫码设备核对，与接收人员完成电子签名交接，生成完整运输记录回传指挥端。",
-                        "children": []
+                                "children": []
                             }
                         ]
                     }
@@ -1390,19 +1444,27 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "道路损毁风险 + 冷链保护需求 → 分析各类地形场景 → 设计四类应对策略 → 形成自适应行进方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "terrain_input", "label": "地形感知输入", "type": "input"},
-                            {"id": "low_speed_mode", "label": "低速稳态模式", "type": "process"},
-                            {"id": "slope_control", "label": "坡度敏感控制", "type": "process"},
-                            {"id": "water_bypass", "label": "涉水绕行策略", "type": "process"},
-                            {"id": "path_replan", "label": "路径重规划", "type": "decision"},
-                            {"id": "strategy_output", "label": "行进策略输出", "type": "output"}
+                            {"id": "terrain_input",
+                                "label": "地形感知输入", "type": "input"},
+                            {"id": "low_speed_mode",
+                                "label": "低速稳态模式", "type": "process"},
+                            {"id": "slope_control",
+                                "label": "坡度敏感控制", "type": "process"},
+                            {"id": "water_bypass", "label": "涉水绕行策略",
+                                "type": "process"},
+                            {"id": "path_replan", "label": "路径重规划",
+                                "type": "decision"},
+                            {"id": "strategy_output",
+                                "label": "行进策略输出", "type": "output"}
                         ],
                         "edges": [
                             {"source": "terrain_input", "target": "low_speed_mode"},
                             {"source": "terrain_input", "target": "slope_control"},
                             {"source": "terrain_input", "target": "water_bypass"},
-                            {"source": "low_speed_mode", "target": "strategy_output"},
-                            {"source": "slope_control", "target": "strategy_output"},
+                            {"source": "low_speed_mode",
+                                "target": "strategy_output"},
+                            {"source": "slope_control",
+                                "target": "strategy_output"},
                             {"source": "water_bypass", "target": "path_replan"},
                             {"source": "path_replan", "target": "strategy_output"}
                         ]
@@ -1455,22 +1517,31 @@ SCENARIOS: List[Scenario] = [
                         "nodes": [
                             {"id": "path_planning", "label": "路径规划", "type": "input"},
                             {"id": "map_data", "label": "地图数据", "type": "input"},
-                            {"id": "road_condition", "label": "实时路况", "type": "input"},
-                            {"id": "anomaly_perception", "label": "异常感知与处理", "type": "process"},
-                            {"id": "anomaly_detection", "label": "感知数据异常", "type": "process"},
+                            {"id": "road_condition",
+                                "label": "实时路况", "type": "input"},
+                            {"id": "anomaly_perception",
+                                "label": "异常感知与处理", "type": "process"},
+                            {"id": "anomaly_detection",
+                                "label": "感知数据异常", "type": "process"},
                             {"id": "robot_dog", "label": "机器狗抵近观察", "type": "process"},
-                            {"id": "dynamic_replan", "label": "动态重规划", "type": "decision"},
+                            {"id": "dynamic_replan",
+                                "label": "动态重规划", "type": "decision"},
                             {"id": "fleet_status", "label": "车队状态", "type": "input"},
-                            {"id": "info_fusion", "label": "地图与异常融合", "type": "process"},
+                            {"id": "info_fusion", "label": "地图与异常融合",
+                                "type": "process"},
                             {"id": "new_path", "label": "新路径输出", "type": "output"}
                         ],
                         "edges": [
                             {"source": "map_data", "target": "path_planning"},
-                            {"source": "road_condition", "target": "path_planning"},
-                            {"source": "path_planning", "target": "anomaly_perception"},
-                            {"source": "anomaly_detection", "target": "anomaly_perception"},
+                            {"source": "road_condition",
+                                "target": "path_planning"},
+                            {"source": "path_planning",
+                                "target": "anomaly_perception"},
+                            {"source": "anomaly_detection",
+                                "target": "anomaly_perception"},
                             {"source": "robot_dog", "target": "anomaly_perception"},
-                            {"source": "anomaly_perception", "target": "dynamic_replan"},
+                            {"source": "anomaly_perception",
+                                "target": "dynamic_replan"},
                             {"source": "fleet_status", "target": "dynamic_replan"},
                             {"source": "info_fusion", "target": "dynamic_replan"},
                             {"source": "dynamic_replan", "target": "new_path"}
@@ -1607,11 +1678,13 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_graph": {
                         "nodes": [
                             {"id": "task_parsing", "label": "任务解析", "type": "input"},
-                            {"id": "vehicle_match", "label": "车辆匹配", "type": "process"},
+                            {"id": "vehicle_match",
+                                "label": "车辆匹配", "type": "process"},
                             {"id": "loading", "label": "装车方案", "type": "process"},
                             {"id": "movement", "label": "行进策略推理", "type": "process"},
                             {"id": "risk", "label": "风险规避", "type": "process"},
-                            {"id": "execution", "label": "物流执行计划", "type": "decision"},
+                            {"id": "execution", "label": "物流执行计划",
+                                "type": "decision"},
                             {"id": "unloading", "label": "卸货操作", "type": "output"}
                         ],
                         "edges": [
@@ -1659,16 +1732,23 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "道路条件评估 → 编队模式选择 → 队形切换规则 → 协同动作库 → 通信协议保障。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "road_condition", "label": "道路条件", "type": "input"},
-                            {"id": "formation_plan", "label": "行进编队规划", "type": "process"},
-                            {"id": "coord_actions", "label": "协同动作管理", "type": "process"},
+                            {"id": "road_condition",
+                                "label": "道路条件", "type": "input"},
+                            {"id": "formation_plan",
+                                "label": "行进编队规划", "type": "process"},
+                            {"id": "coord_actions",
+                                "label": "协同动作管理", "type": "process"},
                             {"id": "v2v_comm", "label": "V2V通信", "type": "process"},
-                            {"id": "formation_output", "label": "编队执行", "type": "output"}
+                            {"id": "formation_output",
+                                "label": "编队执行", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "road_condition", "target": "formation_plan"},
-                            {"source": "formation_plan", "target": "coord_actions"},
-                            {"source": "coord_actions", "target": "formation_output"},
+                            {"source": "road_condition",
+                                "target": "formation_plan"},
+                            {"source": "formation_plan",
+                                "target": "coord_actions"},
+                            {"source": "coord_actions",
+                                "target": "formation_output"},
                             {"source": "v2v_comm", "target": "formation_plan"},
                             {"source": "v2v_comm", "target": "coord_actions"}
                         ]
@@ -1710,9 +1790,11 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_graph": {
                         "nodes": [
                             {"id": "monitor_req", "label": "监控需求解析", "type": "input"},
-                            {"id": "sensor_fusion", "label": "传感器数据融合", "type": "process"},
+                            {"id": "sensor_fusion",
+                                "label": "传感器数据融合", "type": "process"},
                             {"id": "status_judge", "label": "状态判别", "type": "process"},
-                            {"id": "anomaly_handle", "label": "异常处理策略", "type": "decision"},
+                            {"id": "anomaly_handle",
+                                "label": "异常处理策略", "type": "decision"},
                             {"id": "alert_log", "label": "告警与记录", "type": "output"}
                         ],
                         "edges": [
@@ -1839,7 +1921,7 @@ SCENARIOS: List[Scenario] = [
     ),
 
 
-    
+
     # 二、设备投放支援模型测试（7~12）
     Scenario(
         id="equipment_deployment_strategy",  # 设备投放策略（综合场景）
@@ -2395,17 +2477,26 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "任务要素 → 设备匹配 → 数量与方式推断 → 汇总为编组方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "task_analysis", "label": "任务解析(设备Y, 区域X)", "type": "input"},
-                            {"id": "equipment_matching", "label": "设备匹配(无人车+机器狗)", "type": "process"},
-                            {"id": "quantity_inference", "label": "数量计算(载荷+冗余)", "type": "process"},
-                            {"id": "delivery_method", "label": "投放方式选择", "type": "decision"},
-                            {"id": "formation_plan", "label": "编组方案输出", "type": "output"}
+                            {"id": "task_analysis",
+                                "label": "任务解析(设备Y, 区域X)", "type": "input"},
+                            {"id": "equipment_matching",
+                                "label": "设备匹配(无人车+机器狗)", "type": "process"},
+                            {"id": "quantity_inference",
+                                "label": "数量计算(载荷+冗余)", "type": "process"},
+                            {"id": "delivery_method",
+                                "label": "投放方式选择", "type": "decision"},
+                            {"id": "formation_plan",
+                                "label": "编组方案输出", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "task_analysis", "target": "equipment_matching"},
-                            {"source": "equipment_matching", "target": "quantity_inference"},
-                            {"source": "quantity_inference", "target": "delivery_method"},
-                            {"source": "delivery_method", "target": "formation_plan"}
+                            {"source": "task_analysis",
+                                "target": "equipment_matching"},
+                            {"source": "equipment_matching",
+                                "target": "quantity_inference"},
+                            {"source": "quantity_inference",
+                                "target": "delivery_method"},
+                            {"source": "delivery_method",
+                                "target": "formation_plan"}
                         ]
                     }
                 },
@@ -2423,10 +2514,13 @@ SCENARIOS: List[Scenario] = [
                         "nodes": [
                             {"id": "formation", "label": "编组方案", "type": "input"},
                             {"id": "target_loc", "label": "目标定位", "type": "process"},
-                            {"id": "position_opt", "label": "投放位置优化", "type": "process"},
+                            {"id": "position_opt", "label": "投放位置优化",
+                                "type": "process"},
                             {"id": "risk_avoid", "label": "风险规避策略", "type": "process"},
-                            {"id": "loading_ctrl", "label": "自主装卸控制", "type": "process"},
-                            {"id": "deploy_confirm", "label": "投放确认", "type": "output"}
+                            {"id": "loading_ctrl", "label": "自主装卸控制",
+                                "type": "process"},
+                            {"id": "deploy_confirm",
+                                "label": "投放确认", "type": "output"}
                         ],
                         "edges": [
                             {"source": "formation", "target": "target_loc"},
@@ -2453,7 +2547,8 @@ SCENARIOS: List[Scenario] = [
                             {"id": "map_read", "label": "地图读取", "type": "input"},
                             {"id": "terrain_feat", "label": "地物特征识别", "type": "input"},
                             {"id": "occlusion", "label": "遮挡信息分析", "type": "input"},
-                            {"id": "sensor_fusion", "label": "传感器融合定位", "type": "process"},
+                            {"id": "sensor_fusion",
+                                "label": "传感器融合定位", "type": "process"},
                             {"id": "visual", "label": "视觉识别", "type": "process"},
                             {"id": "lidar", "label": "激光雷达测距", "type": "process"},
                             {"id": "depth", "label": "深度感知", "type": "process"},
@@ -2816,15 +2911,21 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "修正后空间位置 → 坐标系转换与精度评估 → 输出标准化定位结果。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "env_analysis", "label": "环境解析\n(地图+地物+遮挡)", "type": "input"},
-                            {"id": "sensor_fusion", "label": "多源传感器融合\n(视觉+激光雷达+深度)", "type": "process"},
-                            {"id": "error_correction", "label": "误差纠正\n(航迹+风场+标志物)", "type": "process"},
-                            {"id": "coord_output", "label": "精确坐标输出\n(WGS84+精度指标)", "type": "output"}
+                            {"id": "env_analysis",
+                                "label": "环境解析\n(地图+地物+遮挡)", "type": "input"},
+                            {"id": "sensor_fusion",
+                                "label": "多源传感器融合\n(视觉+激光雷达+深度)", "type": "process"},
+                            {"id": "error_correction",
+                                "label": "误差纠正\n(航迹+风场+标志物)", "type": "process"},
+                            {"id": "coord_output",
+                                "label": "精确坐标输出\n(WGS84+精度指标)", "type": "output"}
                         ],
                         "edges": [
                             {"source": "env_analysis", "target": "sensor_fusion"},
-                            {"source": "sensor_fusion", "target": "error_correction"},
-                            {"source": "error_correction", "target": "coord_output"}
+                            {"source": "sensor_fusion",
+                                "target": "error_correction"},
+                            {"source": "error_correction",
+                                "target": "coord_output"}
                         ]
                     }
                 }
@@ -3062,16 +3163,24 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "落点偏差分析结果 + 功能状态检查结果 → 规则引擎或决策模型推理 → 输出成功/失败/需重投的判定及详细理由。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "result_perception", "label": "结果感知", "type": "input"},
-                            {"id": "deviation_analysis", "label": "落点偏差分析", "type": "process"},
-                            {"id": "function_check", "label": "功能状态检查", "type": "process"},
-                            {"id": "deployment_judgment", "label": "投放成功判定", "type": "output"}
+                            {"id": "result_perception",
+                                "label": "结果感知", "type": "input"},
+                            {"id": "deviation_analysis",
+                                "label": "落点偏差分析", "type": "process"},
+                            {"id": "function_check",
+                                "label": "功能状态检查", "type": "process"},
+                            {"id": "deployment_judgment",
+                                "label": "投放成功判定", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "result_perception", "target": "deviation_analysis"},
-                            {"source": "result_perception", "target": "function_check"},
-                            {"source": "deviation_analysis", "target": "deployment_judgment"},
-                            {"source": "function_check", "target": "deployment_judgment"}
+                            {"source": "result_perception",
+                                "target": "deviation_analysis"},
+                            {"source": "result_perception",
+                                "target": "function_check"},
+                            {"source": "deviation_analysis",
+                                "target": "deployment_judgment"},
+                            {"source": "function_check",
+                                "target": "deployment_judgment"}
                         ]
                     }
                 }
@@ -3189,17 +3298,22 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "landing_risk → 候选投放策略评估 → 选择具体策略与安全等级 → 输出安全评估结果与建议。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "ground_state", "label": "地面状态识别结果", "type": "input"},
+                            {"id": "ground_state",
+                                "label": "地面状态识别结果", "type": "input"},
                             {"id": "env_factors", "label": "环境因素分析结果", "type": "input"},
-                            {"id": "landing_risk", "label": "降落风险评估", "type": "process"},
-                            {"id": "landing_strategy", "label": "投放策略生成", "type": "decision"},
-                            {"id": "safety_level", "label": "投放点安全等级与建议", "type": "output"}
+                            {"id": "landing_risk", "label": "降落风险评估",
+                                "type": "process"},
+                            {"id": "landing_strategy",
+                                "label": "投放策略生成", "type": "decision"},
+                            {"id": "safety_level",
+                                "label": "投放点安全等级与建议", "type": "output"}
                         ],
                         "edges": [
                             {"source": "ground_state", "target": "landing_risk"},
                             {"source": "env_factors", "target": "landing_risk"},
                             {"source": "landing_risk", "target": "landing_strategy"},
-                            {"source": "landing_strategy", "target": "safety_level"}
+                            {"source": "landing_strategy",
+                                "target": "safety_level"}
                         ]
                     }
                 }
@@ -3300,17 +3414,23 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "risk_level + anomaly_pattern → 候选应急动作集 → 选择并执行策略 → 评估流程是否恢复至安全状态。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "drop_monitoring", "label": "投放动作监测数据", "type": "input"},
-                            {"id": "anomaly_pattern", "label": "异常模式识别结果", "type": "process"},
+                            {"id": "drop_monitoring",
+                                "label": "投放动作监测数据", "type": "input"},
+                            {"id": "anomaly_pattern",
+                                "label": "异常模式识别结果", "type": "process"},
                             {"id": "risk_level", "label": "风险等级判断", "type": "process"},
-                            {"id": "emergency_strategy", "label": "应急策略生成", "type": "decision"},
-                            {"id": "execution_result", "label": "执行结果与流程恢复状态", "type": "output"}
+                            {"id": "emergency_strategy",
+                                "label": "应急策略生成", "type": "decision"},
+                            {"id": "execution_result",
+                                "label": "执行结果与流程恢复状态", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "drop_monitoring", "target": "anomaly_pattern"},
+                            {"source": "drop_monitoring",
+                                "target": "anomaly_pattern"},
                             {"source": "anomaly_pattern", "target": "risk_level"},
                             {"source": "risk_level", "target": "emergency_strategy"},
-                            {"source": "emergency_strategy", "target": "execution_result"}
+                            {"source": "emergency_strategy",
+                                "target": "execution_result"}
                         ]
                     }
                 }
@@ -3424,9 +3544,12 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "任务解析 + 设备匹配 + 数量与方式推理 → 汇总为可执行的救援编组蓝图。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "task", "label": "任务解析(两名伤员,X区域)", "type": "input"},
-                            {"id": "equip", "label": "设备匹配(无人机/担架车/机器人)", "type": "process"},
-                            {"id": "qty", "label": "数量计算(载荷+冗余)", "type": "process"},
+                            {"id": "task",
+                                "label": "任务解析(两名伤员,X区域)", "type": "input"},
+                            {"id": "equip",
+                                "label": "设备匹配(无人机/担架车/机器人)", "type": "process"},
+                            {"id": "qty",
+                                "label": "数量计算(载荷+冗余)", "type": "process"},
                             {"id": "plan", "label": "救援方式规划", "type": "process"},
                             {"id": "team", "label": "编组方案输出", "type": "output"}
                         ],
@@ -3435,6 +3558,374 @@ SCENARIOS: List[Scenario] = [
                             {"source": "equip", "target": "qty"},
                             {"source": "qty", "target": "plan"},
                             {"source": "plan", "target": "team"}
+                        ]
+                    }
+                }
+            }
+        },
+    ),
+    Scenario(
+        id="casualty_rescue_strategy",  # 伤员救助策略（完整综合场景）
+        model_name="伤员救助",
+        name="伤员救助策略",
+        example_input="在区域X（210,145）发现2名伤员，需从位置（85,20）调派无人救援设备前往实施救助，并将伤员运回安全点（60,10），要求全程确保救援过程安全可靠。",
+        reasoning_chain="伤员定位（接收消息、无人机搜索、确定可疑区域、机械狗二次确认）→ 任务解析（受伤人数、环境风险、可达性、急迫程度）→ 伤情评估与分类（是否具备意识+能否行动）→ 救援方式匹配（无人车担架）→ 路径与救援流程优化（选择最安全可达路线、分批救援或集中救援）→ 协同策略（指挥端同步、医疗点准备、途中状态监测）→ 救助完成伤情数据同步（伤情同步、任务闭环）",
+        prompt=(
+            "【伤员救助-伤员救助策略专项要求】\n"
+            "1. 行为树必须至少包含以下核心节点，严格按照推理链条自上而下展开：\n"
+            "   - casualty_localization（伤员定位，核心节点）：必须包含以下子节点：\n"
+            "       * message_reception（接收消息）：接收伤员求救信号或任务指令；\n"
+            "       * uav_search（无人机搜索）：远距热成像扫描与生命信号捕获，包含航迹规划、热成像扫描、信号捕获子节点；\n"
+            "       * suspect_area_determination（确定可疑区域）：区域热斑检测、可疑目标标注、搜索网格生成；\n"
+            "       * robot_dog_confirmation（机械狗二次确认）：近距多模态精定位，包含可穿戴信号、UWB定位、视觉/热成像确认；\n"
+            "       必须包含 knowledge_graph 字段。\n"
+            "   - task_analysis（任务解析）：解析受伤人数（2名）、环境风险、可达性、急迫程度；\n"
+            "   - casualty_assessment_classification（伤情评估与分类，核心节点）：必须包含以下子节点：\n"
+            "       * near_field_sensing_init（近距感知初始化）：高清视觉、深度、红外；\n"
+            "       * key_area_identification（重点部位识别）：出血点、骨折、胸腹部检查；\n"
+            "       * vital_signs_measurement（生命体征测量）：血氧、心率、呼吸、体温；\n"
+            "       * consciousness_mobility_assessment（意识与行动能力评估）：意识状态判定、行动能力判定；\n"
+            "       必须包含 knowledge_graph 字段。\n"
+            "   - rescue_method_matching（救援方式匹配）：担架无人车选型、担架配置、搬运姿势；\n"
+            "   - path_rescue_flow_optimization（路径与救援流程优化）：最安全路线、分批/集中决策、装载顺序；\n"
+            "   - coordination_strategy（协同策略）：指挥端同步、医疗点准备、途中监测；\n"
+            "   - casualty_data_sync（救助完成伤情数据同步，核心节点）：必须包含以下子节点：\n"
+            "       * data_organization_and_sync（伤情数据同步）：数据整理、链路选择、同步策略；\n"
+            "       * task_closure（任务闭环）：同步确认、任务完成报告、资源释放；\n"
+            "       必须包含 knowledge_graph 字段。\n"
+            "2. casualty_localization 的 knowledge_graph 必须体现：接收消息 → 无人机搜索 → 确定可疑区域 → 机械狗确认 → 定位结果输出。\n"
+            "3. casualty_assessment_classification 的 knowledge_graph 必须体现：近距感知 → 重点部位识别 → 生命体征测量 → 意识行动评估 → 伤情分级。\n"
+            "4. casualty_data_sync 的 knowledge_graph 必须体现：数据整理 → 链路选择 → 同步传输 → 确认闭环。\n"
+            "5. 在 node_insights 中，所有节点的 knowledge_trace 必须体现完整推理路径。"
+        ),
+        example_output={
+            "default_focus": "casualty_assessment_classification",
+            "behavior_tree": {
+                "id": "rescue_mission",
+                "label": "🚑 伤员救助任务",
+                "status": "active",
+                "summary": "从(85,20)出发救助区域X(210,145)的2名伤员并运回安全点(60,10)，全流程包含定位、评估、救援、转运与数据同步。",
+                "children": [
+                    {
+                        "id": "casualty_localization",
+                        "label": "📍 伤员定位",
+                        "status": "completed",
+                        "summary": "通过接收消息、无人机远距搜索、确定可疑区域、机器狗二次确认的完整流程，实现区域X(210,145)的2名伤员精确定位，定位精度±0.5m。",
+                        "children": [
+                            {
+                                "id": "message_reception",
+                                "label": "📨 接收消息",
+                                "status": "completed",
+                                "summary": "接收伤员求救信号或指挥端任务指令，初步获取伤员位置区域X(210,145)与伤员数量（2名）信息。",
+                                "children": []
+                            },
+                            {
+                                "id": "uav_search",
+                                "label": "🚁 无人机搜索",
+                                "status": "completed",
+                                "summary": "派遣无人机在100m高度进行热成像扫描与生命信号捕获，覆盖500m×500m搜索区域，飞行时间约8分钟。",
+                                "children": [
+                                    {
+                                        "id": "flight_planning",
+                                        "label": "🗺️ 航迹规划",
+                                        "status": "completed",
+                                        "summary": "规划S型扫描航迹，确保区域全覆盖，航迹间隔50m，扫描效率95%。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "thermal_scanning",
+                                        "label": "🔥 热成像扫描",
+                                        "status": "completed",
+                                        "summary": "热成像相机检测温度异常点（36-37°C人体特征），灵敏度0.1°C，检测距离150m。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "life_signal_capture",
+                                        "label": "📡 生命信号捕获",
+                                        "status": "completed",
+                                        "summary": "扫描蓝牙、WiFi等可穿戴设备信号，辅助定位伤员位置。",
+                                        "children": []
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "suspect_area_determination",
+                                "label": "🎯 确定可疑区域",
+                                "status": "completed",
+                                "summary": "基于热成像扫描结果，检测到2处热源异常点，生成精细搜索网格，定位精度±10m。",
+                                "children": [
+                                    {
+                                        "id": "thermal_spot_detection",
+                                        "label": "🔥 区域热斑检测",
+                                        "status": "completed",
+                                        "summary": "热成像相机检测到2处体温特征的热源点，温度36-37°C，疑似伤员。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "suspect_target_marking",
+                                        "label": "🎯 可疑目标标注",
+                                        "status": "completed",
+                                        "summary": "标注疑似伤员位置为目标A(210,143)与目标B(212,146)，置信度85%。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "search_grid_generation",
+                                        "label": "🗺️ 搜索网格生成",
+                                        "status": "completed",
+                                        "summary": "生成以两处可疑目标为中心的20m×20m精细搜索网格，指导机器狗接近。",
+                                        "children": []
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "robot_dog_confirmation",
+                                "label": "🐕 机械狗二次确认",
+                                "status": "completed",
+                                "summary": "机器狗抵近目标区域，通过可穿戴信号检测、UWB超宽带定位、视觉/热成像特征确认，实现±0.5m精确定位。",
+                                "children": [
+                                    {
+                                        "id": "wearable_signal_detection",
+                                        "label": "⌚ 可穿戴信号检测",
+                                        "status": "completed",
+                                        "summary": "检测到1个可穿戴设备蓝牙信号（伤员A佩戴智能手环），信号强度-60dBm。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "uwb_localization",
+                                        "label": "📍 超宽带定位",
+                                        "status": "completed",
+                                        "summary": "UWB基站与标签测距，定位精度±0.3m，确认伤员A坐标(210.2, 143.1)。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "visual_thermal_confirmation",
+                                        "label": "👁️ 视觉/热成像特征确认",
+                                        "status": "completed",
+                                        "summary": "高清摄像头识别人体轮廓，热成像确认体温分布，置信度98%确认为伤员。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "localization_result",
+                                        "label": "✅ 定位结果输出",
+                                        "status": "completed",
+                                        "summary": "输出伤员A精确坐标(210.15, 143.08)、伤员B坐标(211.92, 145.95)，置信度97%，同步至救援系统。",
+                                        "children": []
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "id": "task_analysis",
+                        "label": "📋 任务解析",
+                        "status": "completed",
+                        "summary": "解析任务参数：伤员人数2名、区域X环境风险中等、可达性良好、急迫程度高。",
+                        "children": []
+                    },
+                    {
+                        "id": "casualty_assessment_classification",
+                        "label": "🏥 伤情评估与分类",
+                        "status": "completed",
+                        "summary": "通过近距多模态感知、重点部位识别、生命体征测量与意识行动能力评估，对2名伤员进行精细伤情分级。",
+                        "children": [
+                            {
+                                "id": "near_field_sensing_init",
+                                "label": "📹 近距感知初始化",
+                                "status": "completed",
+                                "summary": "启动高清视觉、深度相机与红外传感器，构建伤员近场环境模型。",
+                                "children": []
+                            },
+                            {
+                                "id": "key_area_identification",
+                                "label": "🔍 重点部位识别",
+                                "status": "completed",
+                                "summary": "识别伤员A左臂出血点、伤员B疑似左腿骨折，未见明显胸腹部异常。",
+                                "children": []
+                            },
+                            {
+                                "id": "vital_signs_measurement",
+                                "label": "💓 生命体征测量",
+                                "status": "completed",
+                                "summary": "伤员A：血氧95%、心率98、呼吸18、体温36.8°C；伤员B：血氧92%、心率105、呼吸20、体温37.1°C。",
+                                "children": []
+                            },
+                            {
+                                "id": "consciousness_mobility_assessment",
+                                "label": "🧠 意识与行动能力评估",
+                                "status": "completed",
+                                "summary": "伤员A意识清醒、可自主行动但需止血；伤员B意识清醒、行动受限需担架搬运。",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "id": "rescue_method_matching",
+                        "label": "🚑 救援方式匹配",
+                        "status": "completed",
+                        "summary": "匹配2辆担架无人车，配置标准担架与急救包，伤员B平卧搬运、伤员A协助行走上车。",
+                        "children": []
+                    },
+                    {
+                        "id": "path_rescue_flow_optimization",
+                        "label": "🗺️ 路径与救援流程优化",
+                        "status": "completed",
+                        "summary": "选择最安全路线(210,145)→(85,20)→(60,10)，采用分批救援，先转运重伤员B再接伤员A。",
+                        "children": []
+                    },
+                    {
+                        "id": "coordination_strategy",
+                        "label": "🤝 协同策略",
+                        "status": "completed",
+                        "summary": "实时同步指挥端、通知医疗点准备接收、途中持续监测伤员生命体征。",
+                        "children": []
+                    },
+                    {
+                        "id": "casualty_data_sync",
+                        "label": "📡 救助完成伤情数据同步",
+                        "status": "completed",
+                        "summary": "将伤情数据、定位信息、救援记录完整同步至指挥端，形成任务闭环。",
+                        "children": [
+                            {
+                                "id": "data_organization_and_sync",
+                                "label": "🗂️ 伤情数据同步",
+                                "status": "completed",
+                                "summary": "整理2名伤员生命体征、伤情分级、精确坐标，通过4G网络实时同步至指挥端。",
+                                "children": []
+                            },
+                            {
+                                "id": "task_closure",
+                                "label": "✅ 任务闭环",
+                                "status": "completed",
+                                "summary": "指挥端确认数据接收，生成任务完成报告，释放救援设备资源。",
+                                "children": []
+                            }
+                        ]
+                    }
+                ]
+            },
+            "node_insights": {
+                "casualty_localization": {
+                    "title": "伤员定位",
+                    "summary": "从区域任务解析到精确坐标输出的七阶段渐进式定位流程，实现从粗到精的伤员位置确定，最终定位精度±0.5m。",
+                    "key_points": [
+                        "区域任务解析：分析地形特征、遮挡情况与搜索范围，确定定位策略",
+                        "远距感知方式选择：规划无人机航迹、配置热成像扫描与信号捕获方案",
+                        "远距粗粒度定位：热斑检测+目标标注+网格生成，定位精度±10m",
+                        "向精细定位阶段过渡：引导机械狗导航至疑似位置，优化接近路线",
+                        "近距多模态精定位：融合可穿戴信号、UWB、视觉与热成像，精度±0.5m",
+                        "误差修正与坐标融合：多传感器一致性校准、遮挡补偿、异常值剔除",
+                        "定位结果确认与同步：输出精确坐标、置信度评估、同步至救援系统"
+                    ],
+                    "knowledge_trace": "区域任务解析 → 远距感知方式选择 → 远距粗粒度定位 → 向精细定位阶段过渡 → 近距多模态精定位 → 误差修正与坐标融合 → 定位结果确认与同步。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "task_parsing", "label": "区域任务解析", "type": "input"},
+                            {"id": "remote_sensing_selection", "label": "远距感知方式选择", "type": "process"},
+                            {"id": "coarse_localization", "label": "远距粗粒度定位", "type": "process"},
+                            {"id": "transition_to_fine", "label": "向精细定位阶段过渡", "type": "process"},
+                            {"id": "fine_localization", "label": "近距多模态精定位", "type": "process"},
+                            {"id": "error_correction", "label": "误差修正与坐标融合", "type": "process"},
+                            {"id": "result_confirm", "label": "定位结果确认与同步", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "task_parsing", "target": "remote_sensing_selection"},
+                            {"source": "remote_sensing_selection", "target": "coarse_localization"},
+                            {"source": "coarse_localization", "target": "transition_to_fine"},
+                            {"source": "transition_to_fine", "target": "fine_localization"},
+                            {"source": "fine_localization", "target": "error_correction"},
+                            {"source": "error_correction", "target": "result_confirm"}
+                        ]
+                    }
+                },
+                "task_analysis": {
+                    "title": "任务解析",
+                    "summary": "解析任务关键参数，为后续救援决策提供依据。",
+                    "key_points": [
+                        "受伤人数：2名伤员需要救助",
+                        "环境风险：区域X风险等级中等，无明显次生灾害",
+                        "可达性：路线通畅，无人车可直接抵达",
+                        "急迫程度：伤情稳定但需尽快转运"
+                    ],
+                    "knowledge_trace": "任务文本解析 → 提取关键参数 → 评估风险与优先级 → 输出任务配置。"
+                },
+                "casualty_assessment_classification": {
+                    "title": "伤情评估与分类",
+                    "summary": "通过近距感知初始化、重点部位识别、生命体征精细测量，最终形成伤情诊断与救治建议的完整评估流程。",
+                    "key_points": [
+                        "近距感知初始化：启动高清视觉、深度相机与红外传感器，构建伤员近场环境模型",
+                        "重点部位识别：自动识别出血点、骨折可疑部位、胸腹部异常区域",
+                        "生命体征精细测量：精确测量血氧、心率、呼吸频率、体温等关键指标",
+                        "伤情诊断与建议：综合分析形成诊断结论，给出止血、固定、搬运姿势调整等救治建议"
+                    ],
+                    "knowledge_trace": "近距感知初始化 → 重点部位识别 → 生命体征精细测量 → 伤情诊断与建议。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "near_field_sensing_init", "label": "近距感知初始化", "type": "input"},
+                            {"id": "key_area_identification", "label": "重点部位识别", "type": "process"},
+                            {"id": "vital_signs_measurement", "label": "生命体征精细测量", "type": "process"},
+                            {"id": "diagnosis_recommendation", "label": "伤情诊断与建议", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "near_field_sensing_init", "target": "key_area_identification"},
+                            {"source": "key_area_identification", "target": "vital_signs_measurement"},
+                            {"source": "vital_signs_measurement", "target": "diagnosis_recommendation"}
+                        ]
+                    }
+                },
+                "rescue_method_matching": {
+                    "title": "救援方式匹配",
+                    "summary": "根据伤情分级结果，匹配合适的救援设备与搬运方式。",
+                    "key_points": [
+                        "设备选型：2辆担架无人车，载重能力200kg",
+                        "担架配置：标准平板担架，适配骨折与出血伤员",
+                        "搬运姿势：重伤员平卧固定，轻伤员协助上车",
+                        "急救配置：配备止血包、固定夹板等基础急救物资"
+                    ],
+                    "knowledge_trace": "伤情分级结果 → 救援设备匹配 → 搬运方式选择 → 急救物资配置。"
+                },
+                "path_rescue_flow_optimization": {
+                    "title": "路径与救援流程优化",
+                    "summary": "规划最安全高效的救援路线与转运流程。",
+                    "key_points": [
+                        "路径规划：(210,145)→(85,20)→(60,10)，总距离约180m",
+                        "救援策略：分批救援，优先转运行动受限的重伤员",
+                        "时间预估：单程约5分钟，双批次约15分钟完成",
+                        "安全措施：避开坍塌区域，选择平坦路面"
+                    ],
+                    "knowledge_trace": "地图数据 + 伤情分级 → 路径规划 → 批次决策 → 流程优化方案。"
+                },
+                "coordination_strategy": {
+                    "title": "协同策略",
+                    "summary": "确保救援过程中各方协同配合，信息实时共享。",
+                    "key_points": [
+                        "指挥端同步：实时上报救援进度与伤员状态",
+                        "医疗点准备：提前通知医疗点准备接收伤员",
+                        "途中监测：持续监测生命体征，异常时立即告警",
+                        "资源调度：根据实时状况动态调整救援资源"
+                    ],
+                    "knowledge_trace": "任务启动 → 多方通信建立 → 状态实时同步 → 协同执行 → 异常响应。"
+                },
+                "casualty_data_sync": {
+                    "title": "救助完成伤情数据同步",
+                    "summary": "将完整救援数据同步至指挥系统，形成任务闭环。",
+                    "key_points": [
+                        "数据结构整理：汇总生命体征、伤情分级、位置坐标等完整记录",
+                        "通信链路选择：在点对点、组网中继、卫星链路中选择合适传输路径",
+                        "数据同步策略：配置周期同步、事件触发与异常加密传输策略",
+                        "同步确认：指挥端数据校验、时间戳比对，确认接收完成形成任务闭环"
+                    ],
+                    "knowledge_trace": "数据结构整理 → 通信链路选择 → 数据同步策略 → 同步确认。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "data_structure_org", "label": "数据结构整理", "type": "input"},
+                            {"id": "communication_link", "label": "通信链路选择", "type": "process"},
+                            {"id": "sync_strategy", "label": "数据同步策略", "type": "process"},
+                            {"id": "sync_confirmation", "label": "同步确认", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "data_structure_org", "target": "communication_link"},
+                            {"source": "communication_link", "target": "sync_strategy"},
+                            {"source": "sync_strategy", "target": "sync_confirmation"}
                         ]
                     }
                 }
@@ -3856,7 +4347,8 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "任务解析 + 车辆匹配 + 数量计算 + 搭载规划 → 汇总为人员输送编组蓝图。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "task", "label": "任务解析(8名乘员,X区域)", "type": "input"},
+                            {"id": "task",
+                                "label": "任务解析(8名乘员,X区域)", "type": "input"},
                             {"id": "veh", "label": "车辆类型匹配", "type": "process"},
                             {"id": "qty", "label": "车辆数量计算", "type": "process"},
                             {"id": "board", "label": "搭载方案规划", "type": "process"},
@@ -4192,9 +4684,12 @@ SCENARIOS: List[Scenario] = [
                         "nodes": [
                             {"id": "decomp", "label": "任务拆解结果", "type": "input"},
                             {"id": "cost", "label": "路径代价矩阵", "type": "process"},
-                            {"id": "local_policy", "label": "各车本地调度策略 π_i", "type": "process"},
-                            {"id": "local_experience", "label": "本地执行轨迹与经验池 D_i", "type": "process"},
-                            {"id": "consensus", "label": "分布式一致性信息聚合", "type": "process"},
+                            {"id": "local_policy", "label": "各车本地调度策略 π_i",
+                                "type": "process"},
+                            {"id": "local_experience",
+                                "label": "本地执行轨迹与经验池 D_i", "type": "process"},
+                            {"id": "consensus", "label": "分布式一致性信息聚合",
+                                "type": "process"},
                             {"id": "seq", "label": "车辆停靠顺序与任务分配", "type": "process"},
                             {"id": "coord", "label": "多车协同调度方案", "type": "output"}
                         ],
@@ -4309,10 +4804,14 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_graph": {
                         "nodes": [
                             {"id": "cat", "label": "资源类别模型", "type": "input"},
-                            {"id": "track", "label": "追踪方式与读数(多节点)", "type": "process"},
-                            {"id": "status", "label": "资源状态更新(本地视角)", "type": "process"},
-                            {"id": "local_anom", "label": "本地异常检测结果", "type": "process"},
-                            {"id": "consensus_anom", "label": "分布式一致性异常聚合", "type": "process"},
+                            {"id": "track",
+                                "label": "追踪方式与读数(多节点)", "type": "process"},
+                            {"id": "status",
+                                "label": "资源状态更新(本地视角)", "type": "process"},
+                            {"id": "local_anom", "label": "本地异常检测结果",
+                                "type": "process"},
+                            {"id": "consensus_anom",
+                                "label": "分布式一致性异常聚合", "type": "process"},
                             {"id": "anom", "label": "全局异常识别结果", "type": "output"}
                         ],
                         "edges": [
@@ -4899,19 +5398,30 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "物资属性与仓储区域 → 剩余容量计算 → 频次与同类物资位置分析 → 形成仓位推荐方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "material_parsing", "label": "物资属性解析", "type": "input"},
-                            {"id": "warehouse_matching", "label": "仓储类型匹配", "type": "process"},
-                            {"id": "capacity_analysis", "label": "容量分析", "type": "process"},
-                            {"id": "frequency_analysis", "label": "频次分析", "type": "process"},
-                            {"id": "location_matching", "label": "位置匹配", "type": "process"},
-                            {"id": "position_recommendation", "label": "仓位推荐", "type": "output"}
+                            {"id": "material_parsing",
+                                "label": "物资属性解析", "type": "input"},
+                            {"id": "warehouse_matching",
+                                "label": "仓储类型匹配", "type": "process"},
+                            {"id": "capacity_analysis",
+                                "label": "容量分析", "type": "process"},
+                            {"id": "frequency_analysis",
+                                "label": "频次分析", "type": "process"},
+                            {"id": "location_matching",
+                                "label": "位置匹配", "type": "process"},
+                            {"id": "position_recommendation",
+                                "label": "仓位推荐", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "material_parsing", "target": "warehouse_matching"},
-                            {"source": "warehouse_matching", "target": "capacity_analysis"},
-                            {"source": "capacity_analysis", "target": "frequency_analysis"},
-                            {"source": "frequency_analysis", "target": "location_matching"},
-                            {"source": "location_matching", "target": "position_recommendation"}
+                            {"source": "material_parsing",
+                                "target": "warehouse_matching"},
+                            {"source": "warehouse_matching",
+                                "target": "capacity_analysis"},
+                            {"source": "capacity_analysis",
+                                "target": "frequency_analysis"},
+                            {"source": "frequency_analysis",
+                                "target": "location_matching"},
+                            {"source": "location_matching",
+                                "target": "position_recommendation"}
                         ]
                     }
                 },
@@ -5215,21 +5725,34 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "库存数据对比 → 短缺检测 → 过期检测 → 误放检测 → 差异汇总。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "inventory_parsing", "label": "库存数据解析", "type": "input"},
-                            {"id": "strategy_formulation", "label": "盘点策略制定", "type": "process"},
-                            {"id": "shortage_detection", "label": "短缺检测", "type": "process"},
-                            {"id": "expiry_detection", "label": "过期检测", "type": "process"},
-                            {"id": "misplacement_detection", "label": "误放检测", "type": "process"},
-                            {"id": "difference_summary", "label": "差异汇总", "type": "output"}
+                            {"id": "inventory_parsing",
+                                "label": "库存数据解析", "type": "input"},
+                            {"id": "strategy_formulation",
+                                "label": "盘点策略制定", "type": "process"},
+                            {"id": "shortage_detection",
+                                "label": "短缺检测", "type": "process"},
+                            {"id": "expiry_detection",
+                                "label": "过期检测", "type": "process"},
+                            {"id": "misplacement_detection",
+                                "label": "误放检测", "type": "process"},
+                            {"id": "difference_summary",
+                                "label": "差异汇总", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "inventory_parsing", "target": "strategy_formulation"},
-                            {"source": "strategy_formulation", "target": "shortage_detection"},
-                            {"source": "strategy_formulation", "target": "expiry_detection"},
-                            {"source": "strategy_formulation", "target": "misplacement_detection"},
-                            {"source": "shortage_detection", "target": "difference_summary"},
-                            {"source": "expiry_detection", "target": "difference_summary"},
-                            {"source": "misplacement_detection", "target": "difference_summary"}
+                            {"source": "inventory_parsing",
+                                "target": "strategy_formulation"},
+                            {"source": "strategy_formulation",
+                                "target": "shortage_detection"},
+                            {"source": "strategy_formulation",
+                                "target": "expiry_detection"},
+                            {"source": "strategy_formulation",
+                                "target": "misplacement_detection"},
+                            {"source": "shortage_detection",
+                                "target": "difference_summary"},
+                            {"source": "expiry_detection",
+                                "target": "difference_summary"},
+                            {"source": "misplacement_detection",
+                                "target": "difference_summary"}
                         ]
                     }
                 },
@@ -5488,17 +6011,26 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "需求清单 → 库存批次 → 保质期与FIFO排序 → 批次锁定并生成出库方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "requirement_parsing", "label": "任务需求解析(急救包10,绷带20,注射器40)", "type": "input"},
-                            {"id": "inventory_matching", "label": "库存匹配(急救包12,绷带30,注射器80)", "type": "process"},
-                            {"id": "strategy_selection", "label": "出库策略选择(保质期优先+FIFO)", "type": "decision"},
-                            {"id": "batch_determination", "label": "批次确定(A5,B5,C20,D40)", "type": "process"},
-                            {"id": "outbound_plan", "label": "出库方案生成(70件,1小时内交付)", "type": "output"}
+                            {"id": "requirement_parsing",
+                                "label": "任务需求解析(急救包10,绷带20,注射器40)", "type": "input"},
+                            {"id": "inventory_matching",
+                                "label": "库存匹配(急救包12,绷带30,注射器80)", "type": "process"},
+                            {"id": "strategy_selection",
+                                "label": "出库策略选择(保质期优先+FIFO)", "type": "decision"},
+                            {"id": "batch_determination",
+                                "label": "批次确定(A5,B5,C20,D40)", "type": "process"},
+                            {"id": "outbound_plan",
+                                "label": "出库方案生成(70件,1小时内交付)", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "requirement_parsing", "target": "inventory_matching"},
-                            {"source": "inventory_matching", "target": "strategy_selection"},
-                            {"source": "strategy_selection", "target": "batch_determination"},
-                            {"source": "batch_determination", "target": "outbound_plan"}
+                            {"source": "requirement_parsing",
+                                "target": "inventory_matching"},
+                            {"source": "inventory_matching",
+                                "target": "strategy_selection"},
+                            {"source": "strategy_selection",
+                                "target": "batch_determination"},
+                            {"source": "batch_determination",
+                                "target": "outbound_plan"}
                         ]
                     }
                 },
@@ -5752,19 +6284,30 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "状态与需求 → 优先级排序 → 备份与替换准备 → 排期落表 → 输出维护方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "status_parsing", "label": "资源状态解析(电池500h/70%,设备800h)", "type": "input"},
-                            {"id": "requirement_judgment", "label": "维护需求判断(检测/校准/检查)", "type": "process"},
-                            {"id": "priority_sorting", "label": "优先级排序(电池检测>设备校准)", "type": "decision"},
-                            {"id": "replacement_plan", "label": "资源替换方案(备用电池2,设备1)", "type": "process"},
-                            {"id": "schedule_arrangement", "label": "调度安排(48h内完成)", "type": "process"},
-                            {"id": "maintenance_plan", "label": "维护方案生成(含复检与记录)", "type": "output"}
+                            {"id": "status_parsing",
+                                "label": "资源状态解析(电池500h/70%,设备800h)", "type": "input"},
+                            {"id": "requirement_judgment",
+                                "label": "维护需求判断(检测/校准/检查)", "type": "process"},
+                            {"id": "priority_sorting",
+                                "label": "优先级排序(电池检测>设备校准)", "type": "decision"},
+                            {"id": "replacement_plan",
+                                "label": "资源替换方案(备用电池2,设备1)", "type": "process"},
+                            {"id": "schedule_arrangement",
+                                "label": "调度安排(48h内完成)", "type": "process"},
+                            {"id": "maintenance_plan",
+                                "label": "维护方案生成(含复检与记录)", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "status_parsing", "target": "requirement_judgment"},
-                            {"source": "requirement_judgment", "target": "priority_sorting"},
-                            {"source": "priority_sorting", "target": "replacement_plan"},
-                            {"source": "replacement_plan", "target": "schedule_arrangement"},
-                            {"source": "schedule_arrangement", "target": "maintenance_plan"}
+                            {"source": "status_parsing",
+                                "target": "requirement_judgment"},
+                            {"source": "requirement_judgment",
+                                "target": "priority_sorting"},
+                            {"source": "priority_sorting",
+                                "target": "replacement_plan"},
+                            {"source": "replacement_plan",
+                                "target": "schedule_arrangement"},
+                            {"source": "schedule_arrangement",
+                                "target": "maintenance_plan"}
                         ]
                     }
                 },
@@ -5826,7 +6369,8 @@ def find_best_scenario(model_name: str, query: str) -> Tuple[Optional[Scenario],
 
     返回 (Scenario 或 None, 相似度 0~1)。
     """
-    candidates: List[Scenario] = [s for s in SCENARIOS if s.model_name == model_name]
+    candidates: List[Scenario] = [
+        s for s in SCENARIOS if s.model_name == model_name]
     if not candidates:
         return None, 0.0
 
@@ -5842,5 +6386,3 @@ def find_best_scenario(model_name: str, query: str) -> Tuple[Optional[Scenario],
 
 
 __all__ = ["Scenario", "SCENARIOS", "find_best_scenario"]
-
-
