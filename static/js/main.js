@@ -9,6 +9,10 @@ let currentTreeScale = 1;
 let graphObj = null; // G6图实例
 let insightGraphObj = null; // 右侧知识图谱G6实例
 
+// 暴露到window对象供外部访问（用于截图脚本）
+window.graphObj = null;
+window.insightGraphObj = null;
+
 document.addEventListener('DOMContentLoaded', () => {
     initializeControls();
     registerShortcuts();
@@ -372,24 +376,35 @@ function renderBehaviorTree(treeData) {
                 return; // 叶子节点不需要展开/折叠
             }
 
-            // 使用G6的collapseExpand方法
-            const currentCollapsed = model.collapsed;
-            graphObj.collapseExpand(node, !currentCollapsed);
-
-            // 重新布局
+            // 切换节点的折叠状态
+            const currentCollapsed = model.collapsed || false;
+            
+            // 更新节点的 collapsed 属性
+            graphObj.updateItem(node, {
+                collapsed: !currentCollapsed
+            });
+            
+            // 重新布局并自适应视图
+            graphObj.layout();
             setTimeout(() => {
                 graphObj.fitView();
-            }, 200);
+            }, 300);
         });
 
         graphObj.data(graphData);
         graphObj.render();
         graphObj.fitView();
+        
+        // 暴露到window对象供外部访问
+        window.graphObj = graphObj;
     } else {
         // 更新数据
         graphObj.data(graphData);
         graphObj.render();
         graphObj.fitView();
+        
+        // 更新window对象引用
+        window.graphObj = graphObj;
     }
 }
 
@@ -563,6 +578,62 @@ function getMaxBreadth(root) {
 
 // ===== 右侧知识图谱相关 =====
 
+/**
+ * 检测图是否为线性链（每个节点最多有一个入边和一个出边）
+ */
+function detectLinearChain(g6Data) {
+    if (!g6Data || !g6Data.nodes || !g6Data.edges) {
+        return false;
+    }
+    
+    const nodeCount = g6Data.nodes.length;
+    const edgeCount = g6Data.edges.length;
+    
+    // 如果边数不等于节点数-1，不是简单链
+    if (edgeCount !== nodeCount - 1) {
+        return false;
+    }
+    
+    // 统计每个节点的入度和出度
+    const inDegree = {};
+    const outDegree = {};
+    
+    g6Data.nodes.forEach(node => {
+        inDegree[node.id] = 0;
+        outDegree[node.id] = 0;
+    });
+    
+    g6Data.edges.forEach(edge => {
+        outDegree[edge.source] = (outDegree[edge.source] || 0) + 1;
+        inDegree[edge.target] = (inDegree[edge.target] || 0) + 1;
+    });
+    
+    // 检查是否为链式结构
+    // 应该有1个节点入度为0（起点），1个节点出度为0（终点），其他节点入度=出度=1
+    let startNodes = 0;
+    let endNodes = 0;
+    let middleNodes = 0;
+    
+    g6Data.nodes.forEach(node => {
+        const inDeg = inDegree[node.id] || 0;
+        const outDeg = outDegree[node.id] || 0;
+        
+        if (inDeg === 0 && outDeg === 1) {
+            startNodes++;
+        } else if (inDeg === 1 && outDeg === 0) {
+            endNodes++;
+        } else if (inDeg === 1 && outDeg === 1) {
+            middleNodes++;
+        } else {
+            // 有分叉或其他复杂结构
+            return false;
+        }
+    });
+    
+    // 标准链式结构：1个起点，1个终点，其他都是中间节点
+    return startNodes === 1 && endNodes === 1 && middleNodes === (nodeCount - 2);
+}
+
 function renderInsightGraph(graphData) {
     const container = document.getElementById('insightGraphContainer');
     if (!container) return;
@@ -584,15 +655,47 @@ function renderInsightGraph(graphData) {
     // ===== 调试输出：转换后的G6数据 =====
     console.log('[renderInsightGraph] g6Data for G6:', g6Data);
 
+    // 检测图的结构，决定使用哪种布局
+    const isLinearChain = detectLinearChain(g6Data);
+    console.log('[renderInsightGraph] 是否为线性链:', isLinearChain);
+
     if (!insightGraphObj) {
+    // 根据图结构选择布局类型
+    let layoutConfig;
+    if (isLinearChain) {
+        layoutConfig = {
+            type: 'fruchterman',
+            gravity: 5, // 重力大小，影响布局紧凑程度
+            speed: 5, // 每次迭代的速度
+            clustering: true, // 是否按照聚类信息布局
+            maxIteration: 1000, // 最大迭代次数
+            preventOverlap: true, // 防止节点重叠
+            nodeSize: 80, // 节点大小
+            // 自定义力的方向，使节点在垂直方向也有分布
+            gpuEnabled: false,
+        };
+    } else {
+        // 非线性图：使用fruchterman布局（更适合展示复杂关系）
+        layoutConfig = {
+            type: 'fruchterman',
+            gravity: 5, // 重力大小，影响布局紧凑程度
+            speed: 5, // 每次迭代的速度
+            clustering: true, // 是否按照聚类信息布局
+            maxIteration: 1000, // 最大迭代次数
+            preventOverlap: true, // 防止节点重叠
+            nodeSize: 80, // 节点大小
+            // 自定义力的方向，使节点在垂直方向也有分布
+            gpuEnabled: false,
+        };
+    }
+
         // 初始化G6知识图谱
         insightGraphObj = new G6.Graph({
             container: container,
-            width: container.offsetWidth - 10, // 留边距避免滚动条
-            height: container.offsetHeight - 10, // 留边距
+            width: container.offsetWidth - 10,
+            height: container.offsetHeight - 10,
             linkCenter: true,
             modes: {
-                // 允许拖动画布、缩放画布，以及直接拖动节点
                 default: ['drag-canvas', 'zoom-canvas', 'drag-node'],
             },
             defaultNode: {
@@ -607,17 +710,19 @@ function renderInsightGraph(graphData) {
                 }
             },
             defaultEdge: {
+                // type: 'polyline',
                 type: 'cubic-horizontal',
                 style: {
                     stroke: '#90CAF9',
                     lineWidth: 2,
                     endArrow: true,
+                    radius: 10, // 转角半径
                 }
             },
             layout: {
                 type: 'force',
                 linkDistance: 120,  // 边长度 - 适当减小让布局更紧凑
-                nodeStrength: -300, // 节点排斥力 - 减小让布局更快稳定
+                nodeStrength: 10, // 节点排斥力 - 减小让布局更快稳定
                 edgeStrength: 0.6,  // 边吸引力 - 增强让节点更快就位
                 preventOverlap: true, // 防止重叠
                 nodeSize: 80, // 节点大小
@@ -653,14 +758,20 @@ function renderInsightGraph(graphData) {
 
     insightGraphObj.data(g6Data);
     insightGraphObj.render();
+    
+    // 暴露到window对象供外部访问
+    window.insightGraphObj = insightGraphObj;
 
-    // 力导向布局需要时间来稳定，延迟执行fitView
+    // 根据图类型设置不同的等待时间
+    const waitTime = isLinearChain ? 300 : 500; // dagre布局更快，force布局需要更长时间
+    
+    // 延迟执行fitView
     setTimeout(() => {
         insightGraphObj.fitView({
             padding: 20,  // 添加内边距
             includeEdges: true  // 包含边框计算
         });
-    }, 500);  // 等待500ms让布局稳定
+    }, waitTime);
 }
 
 function convertInsightToG6Format(graphData) {

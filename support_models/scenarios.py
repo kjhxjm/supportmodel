@@ -486,51 +486,62 @@ SCENARIOS: List[Scenario] = [
         },
     ),
     Scenario(
-        id="offroad_cargo_monitor",  # 3. 货物状态监控
+        id="offroad_fleet_cargo_monitor",  # 3. 车队/货物状态监控
         model_name="越野物流",
-        name="货物状态监控与保全",
-        example_input="向X位置运输冷冻食品Y",
-        reasoning_chain="货物运输要求（温度等约束）→ 车辆匹配（选择具备温度传感器和保温/制冷能力的车辆）→ 异常感知与处理（设定温度采集频率，登记并上报温度异常，触发保全策略）",
+        name="车队/货物状态监控",
+        example_input="运输冷链物资Y至目的地X，需确保车辆与货物保持稳定状态。",
+        reasoning_chain="监控需求解析（车辆状态、速度、温度、振动、能耗）→ 传感器数据融合（温度传感器、车载健康监测、GPS、IMU）→ 状态判别（检测异常升温、胎压异常、路线偏移、能量不足等）→ 异常处理策略（降速保温、切换备用车辆、调整路线、提升采样频率）→ 告警与记录（生成异常提示与任务执行日志，并同步至指挥端）",
         prompt=(
-            "【越野物流-货物状态监控与保全专项要求（粒度强化版）】\n"
+            "【越野物流-车队/货物状态监控专项要求】\n"
             "1. 行为树必须包含：\n"
-            "   - task_analysis（任务解析）：解析“冷冻食品Y”对温度、湿度、震动的要求；\n"
-            "   - vehicle_matching（车辆匹配）：细化为传感器配置、制冷/保温能力匹配等子要点；\n"
-            "   - monitoring_setup（监控设置）：必须明确采样频率、告警阈值、上报周期；\n"
-            "   - anomaly_handling（异常感知与处理，核心决策节点）：实时监控温度/震动等参数并触发保全策略，必须包含 knowledge_graph。\n"
-            "2. anomaly_handling 节点的 knowledge_graph 必须体现：\n"
-            "   状态监测(status_monitoring) → 异常识别(anomaly_detection) → 风险评估(risk_assessment) → 保全策略(preservation_strategy) → 执行响应(action_response)。\n"
+            "   - task_analysis（任务解析）：解析冷链物资Y的温控要求、车辆稳定性需求与目的地X的运输约束；\n"
+            "   - monitoring_requirement_analysis（监控需求解析）：明确车辆状态（健康、速度、能耗、位置）与货物状态（温度、振动、完整性）的监控维度；\n"
+            "   - sensor_fusion（传感器数据融合）：整合温度传感器、车载健康监测、GPS、IMU、胎压传感器、能耗监测等多源数据；\n"
+            "   - status_judgment（状态判别）：识别异常升温、胎压异常、路线偏移、能量不足、过度振动等多类异常；\n"
+            "   - anomaly_response（异常处理与告警，核心决策节点）：\n"
+            "       * 生成分级告警与应对策略（降速保温、切换备用车辆、调整路线、提升采样频率），并同步至指挥端，必须包含 knowledge_graph。\n"
+            "2. anomaly_response 节点的 knowledge_graph 必须体现：\n"
+            "   监控需求(monitoring_requirements) → 传感器融合(sensor_fusion) → 状态判别(status_judgment) → 异常策略(response_strategy) → 告警记录(alert_logging)。\n"
             "3. node_insights 要求：\n"
-            "   - 对监控参数设置、告警阈值设计与保全动作（调温、减速、改道、紧急停车等）进行条目化说明；\n"
-            "   - knowledge_trace 体现“持续监控 → 及时告警 → 策略选择 → 行动闭环”的全过程。"
+            "   - 详细说明车辆健康监测指标（胎压、能耗、速度、位置偏移）与货物监控指标（温度、振动）的阈值设计；\n"
+            "   - 阐述多源传感器数据融合的逻辑与异常识别规则；\n"
+            "   - 对异常处理策略（降速、改道、切换车辆、停车检查）进行条目化说明，包含触发条件与执行优先级；\n"
+            "   - knowledge_trace 体现\"需求解析 → 数据融合 → 异常识别 → 策略执行 → 告警记录\"的完整闭环。"
         ),
         example_output={
-            "default_focus": "anomaly_handling",
+            "default_focus": "anomaly_response",
             "behavior_tree": {
                 "id": "task_analysis",
-                "label": "🚛 任务解析：冷冻食品Y运往位置X，需全程冷链",
+                "label": "🚛 任务解析：冷链物资Y运至目的地X，确保车辆与货物稳定",
                 "status": "completed",
-                "summary": "解析冷冻食品Y需全程保持冷链温区、控制越野震动并在时限内送达X，输出可执行的运输要求。",
+                "summary": "解析\"运输冷链物资Y至目的地X，需确保车辆与货物保持稳定状态\"任务，明确冷链温控要求、车辆健康监测需求与运输稳定性约束。",
                 "children": [
                     {
-                        "id": "vehicle_matching",
-                        "label": "🚚 车辆匹配：冷链越野车+温度传感器",
+                        "id": "monitoring_requirement_analysis",
+                        "label": "📊 监控需求解析",
                         "status": "completed",
-                        "summary": "选择具备密闭冷链舱、双温度传感器与减震底盘的越野车，制冷与续航覆盖任务时长。",
+                        "summary": "明确车辆监控维度（健康状态、速度、能耗、位置）与货物监控维度（温度、振动、完整性），形成全面监控需求清单。",
                         "children": []
                     },
                     {
-                        "id": "monitoring_setup",
-                        "label": "🛰️ 监控设置：温度秒级采样，阈值基于冷链标准",
+                        "id": "sensor_fusion",
+                        "label": "🛰️ 传感器数据融合",
                         "status": "completed",
-                        "summary": "配置温度秒级采样、震动高频采样；温度偏离冷链标准即预警，正常周期上报，异常加密上报。",
+                        "summary": "整合温度传感器（双探头，采样频率1Hz）、车载健康监测（胎压、电池电压、电机温度）、GPS（位置更新频率5Hz）、IMU（振动与姿态，采样频率50Hz）等多源数据。",
                         "children": []
                     },
                     {
-                        "id": "anomaly_handling",
-                        "label": "⚠️ 货物监控与保全：温度越界或震动超标即告警",
+                        "id": "status_judgment",
+                        "label": "🔍 状态判别",
+                        "status": "completed",
+                        "summary": "识别多类异常：温度偏离冷链标准（-18±3°C）、胎压异常（偏离正常值>15%）、路线偏移（>50m）、能量不足（<20%）、过度振动（>2g持续5秒）。",
+                        "children": []
+                    },
+                    {
+                        "id": "anomaly_response",
+                        "label": "⚠️ 异常处理与告警",
                         "status": "active",
-                        "summary": "持续监测温度/震动，偏离冷链温区或震动超标即分级告警，并执行调温、减速/改道、停车检查等动作并闭环记录。",
+                        "summary": "根据异常类型与严重程度执行分级响应：轻度（提升采样频率+预警）、中度（降速保温或调整路线+告警）、严重（切换备用车辆或停车检查+紧急告警），所有异常与处理动作同步至指挥端并生成执行日志。",
                         "children": []
                     }
                 ]
@@ -538,68 +549,81 @@ SCENARIOS: List[Scenario] = [
             "node_insights": {
                 "task_analysis": {
                     "title": "任务解析",
-                    "summary": "将“向X位置运输冷冻食品Y”细化为保持冷链温区、抑制越野震动、按时送达的三项硬约束。",
+                    "summary": "将\"运输冷链物资Y至目的地X，需确保车辆与货物保持稳定状态\"细化为车辆健康监测、货物冷链保障与运输完整性三大监控目标。",
                     "key_points": [
-                        "明确需保持冷链温区（符合冷冻食品标准），持续性超限需处理",
-                        "震动需控制在包装/货品可接受范围，超标触发减速与检查",
-                        "时效要求在任务约束内送达，并预留异常处置缓冲"
+                        "识别冷链物资Y需保持冷链温区（-18±3°C）并控制振动在安全范围内",
+                        "明确车辆需全程监测健康状态（胎压、能耗、速度、位置）确保运输可靠性",
+                        "确定目的地X的路线与时效约束，预留异常处置与路线调整缓冲",
+                        "推断需要建立车辆-货物双重监控体系，支持实时告警与应对"
                     ],
-                    "knowledge_trace": "任务文本解析 → 温度/震动/时限约束提取 → 形成冷链运输标准输入。"
+                    "knowledge_trace": "任务文本解析 → 车辆/货物/路线约束提取 → 形成双重监控需求输入。"
                 },
-                "vehicle_matching": {
-                    "title": "车辆匹配",
-                    "summary": "选用具备独立制冷、双温度传感器与减震能力的冷链越野车，可支持冗余与持续冷链。",
+                "monitoring_requirement_analysis": {
+                    "title": "监控需求解析",
+                    "summary": "细化车辆监控维度（健康状态、速度、能耗、位置偏移）与货物监控维度（温度、振动、完整性），形成全面监控指标体系。",
                     "key_points": [
-                        "车辆配置：冷链舱+独立制冷单元，支持持续低温运行",
-                        "感知配置：双温度探头分区监测，具备基础校准能力",
-                        "减震能力：越野悬挂与胎压调节，降低路面冲击",
-                        "冗余策略：至少双车以便故障切换或补位",
-                        "供电与续航：制冷与行驶续航覆盖任务时长并留有余量"
+                        "车辆健康监测：胎压（正常范围±15%）、电池电压/能量（告警阈值20%）、电机温度（过热阈值85°C）、传动系统状态",
+                        "车辆运行监测：速度（限速与实际速度对比）、GPS位置（偏离路线阈值50m）、行驶里程累计",
+                        "货物状态监测：温度（冷链标准-18±3°C）、振动加速度（告警阈值2g持续5秒）、货舱完整性（门锁状态、密封性）",
+                        "环境监测：外部温度、湿度、路面状况（通过IMU推断）",
+                        "通信状态：数据链路质量、上报延迟、指挥端连接状态"
                     ],
-                    "knowledge_trace": "冷链温度/震动要求 → 车辆候选筛选 → 选定双传感器冷链越野车。"
+                    "knowledge_trace": "任务约束 → 车辆/货物/环境维度拆解 → 形成多维监控需求清单与阈值配置。"
                 },
-                "monitoring_setup": {
-                    "title": "监控设置",
-                    "summary": "温度采用秒级采样、震动高频采样；基于冷链标准设置预警/告警阈值，超限触发加密上报与动作。",
+                "sensor_fusion": {
+                    "title": "传感器数据融合",
+                    "summary": "整合温度传感器、车载健康监测、GPS、IMU等多源传感器数据，形成统一的车辆-货物状态评估数据流。",
                     "key_points": [
-                        "采样频率：温度保持秒级，震动保持高频，异常时可临时提升",
-                        "阈值设计：温度偏离冷链标准、震动超出包装承受值即预警",
-                        "上报策略：正常周期上报，预警缩短周期，告警实时+事件日志",
-                        "震动门限：超过设定上限时触发减速与检查提示",
-                        "冗余校验：双探头读数偏差超设定门限时触发自检/校准提醒"
+                        "温度传感器：双探头配置（货舱前部+后部），采样频率1Hz，精度±0.5°C，异常时提升至5Hz",
+                        "车载健康监测：胎压传感器（4轮独立监测，更新频率0.2Hz）、电池管理系统（电压、电流、SOC、温度，1Hz）、电机控制器（温度、转速、扭矩，5Hz）",
+                        "GPS定位：位置更新频率5Hz，精度<5m，支持差分增强，持续记录轨迹与偏离计算",
+                        "IMU传感器：6轴加速度与陀螺仪，采样频率50Hz，用于振动监测、姿态评估与路况推断",
+                        "数据融合策略：时间戳对齐、异常值过滤（3σ原则）、多传感器交叉验证（如胎压与振动关联分析）、状态估计（卡尔曼滤波）"
                     ],
-                    "knowledge_trace": "监控参数设计 → 采样/阈值/上报配置 → 绑定告警触发条件。"
+                    "knowledge_trace": "监控需求 → 传感器选型与配置 → 数据采集与预处理 → 时间对齐与融合 → 输出统一状态数据流。"
                 },
-                "anomaly_handling": {
-                    "title": "货物监控与保全",
-                    "summary": "基于温度/震动实时数据分级响应：预警调温+减速，告警改道或短暂停靠，紧急阶段停车保持制冷并人工确认。",
+                "status_judgment": {
+                    "title": "状态判别",
+                    "summary": "基于融合后的传感器数据，识别车辆与货物的多类异常情况并进行严重程度分级。",
                     "key_points": [
-                        "检测链路：温度/震动→阈值判断→趋势预测，持续超限即进入预警",
-                        "分级策略：预警→调温+减速；告警→改道/短暂停靠；紧急→停车+人工检查",
-                        "频率提升：进入预警后提升采样与上报频率，确保闭环",
-                        "闭环记录：执行动作后记录“阈值-时间-动作-结果”，供后续复盘",
-                        "可靠性校验：动作后若温度/震动未恢复，触发备用车辆接替或继续处置"
+                        "温度异常：偏离-18°C超过±3°C持续30秒→轻度预警；超过±5°C持续60秒→中度告警；超过±8°C或制冷系统故障→严重告警",
+                        "振动异常：加速度>1.5g持续3秒→轻度预警（提示减速）；>2g持续5秒→中度告警（强制减速）；>3g或检测到货物移位→严重告警（停车检查）",
+                        "胎压异常：单轮偏离正常值10-15%→轻度预警；>15%或压力快速下降→中度告警；>25%或检测到漏气→严重告警（停车更换）",
+                        "路线偏移：偏离计划路线20-50m→轻度预警（自动纠偏）；>50m持续30秒→中度告警（重新规划）；进入禁行区或危险区域→严重告警（立即停车）",
+                        "能量不足：剩余电量20-30%→轻度预警（规划补能）；10-20%→中度告警（寻找最近补能点）；<10%→严重告警（就近停车等待救援）",
+                        "通信异常：数据延迟>5秒→轻度预警；连接中断30秒→中度告警（启用离线模式）；中断>3分钟→严重告警（任务暂停）"
                     ],
-                    "knowledge_trace": "货物运输要求 → 车辆匹配 → 监控配置 → 异常识别 → 风险分级 → 保全动作执行与结果回写。",
+                    "knowledge_trace": "融合数据流 → 阈值与规则判断 → 异常类型识别 → 严重程度分级（轻度/中度/严重） → 输出异常事件列表。"
+                },
+                "anomaly_response": {
+                    "title": "异常处理与告警",
+                    "summary": "根据异常类型与严重程度，执行分级响应策略并生成告警记录，确保车辆与货物安全，所有处理动作同步至指挥端。",
+                    "key_points": [
+                        "轻度预警响应：提升相关传感器采样频率（如温度异常时从1Hz提升至5Hz）、增加数据上报频率（从30秒/次缩短至5秒/次）、生成预警消息发送至指挥端、记录预警事件与时间戳",
+                        "中度告警响应：执行主动干预措施（温度异常→增强制冷功率；振动异常→降速至安全速度；胎压异常→调整行驶模式；路线偏移→重新规划路径；能量不足→导航至最近补能点）、生成告警消息并要求指挥端确认、持续监测异常指标变化趋势",
+                        "严重告警响应：执行紧急措施（停车检查、切换至备用车辆、请求人工干预）、生成紧急告警并实时推送至指挥端、启动应急预案（如货物转移、现场维修、等待救援）、锁定现场状态数据用于事故分析",
+                        "多异常协同处理：同时出现多类异常时，按优先级排序（生命安全>货物安全>任务效率），优先处理高优先级异常，记录所有异常的时序关系",
+                        "闭环验证与记录：每次处理动作执行后，验证异常是否消除或缓解，记录\"异常类型-检测时间-处理动作-执行时间-恢复时间-最终状态\"完整链路，生成任务执行日志并归档"
+                    ],
+                    "knowledge_trace": "监控需求解析 → 传感器数据融合 → 状态判别与分级 → 异常响应策略选择 → 执行处理动作 → 告警与日志生成 → 同步至指挥端 → 闭环验证。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "cargo_requirements", "label": "货物要求(冷链温区,抗震需求)", "type": "input"},
-                            {"id": "vehicle_matching", "label": "车辆匹配(冷链越野车,双探头)", "type": "process"},
-                            {"id": "monitoring_setup", "label": "监控配置(温度秒级,震动高频)", "type": "process"},
-                            {"id": "status_monitoring", "label": "状态监测(实时温度/震动)", "type": "input"},
-                            {"id": "anomaly_detection", "label": "异常识别(阈值+趋势)", "type": "process"},
-                            {"id": "risk_assessment", "label": "风险评估(预警/告警/紧急)", "type": "process"},
-                            {"id": "preservation_strategy", "label": "保全策略(调温/减速/改道/停车)", "type": "decision"},
-                            {"id": "action_response", "label": "执行响应(加密上报,动作日志)", "type": "output"}
+                            {"id": "monitoring_requirements", "label": "监控需求(车辆健康,货物状态,位置能耗)", "type": "input"},
+                            {"id": "sensor_fusion", "label": "传感器融合(温度,GPS,IMU,胎压,能耗)", "type": "process"},
+                            {"id": "status_judgment", "label": "状态判别(温度,振动,胎压,路线,能量)", "type": "process"},
+                            {"id": "anomaly_classification", "label": "异常分级(轻度/中度/严重)", "type": "process"},
+                            {"id": "response_strategy", "label": "响应策略(提频/降速/改道/切换/停车)", "type": "decision"},
+                            {"id": "alert_logging", "label": "告警与记录(实时推送,执行日志)", "type": "output"},
+                            {"id": "command_sync", "label": "指挥端同步(状态+告警+日志)", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "cargo_requirements", "target": "vehicle_matching"},
-                            {"source": "vehicle_matching", "target": "monitoring_setup"},
-                            {"source": "monitoring_setup", "target": "status_monitoring"},
-                            {"source": "status_monitoring", "target": "anomaly_detection"},
-                            {"source": "anomaly_detection", "target": "risk_assessment"},
-                            {"source": "risk_assessment", "target": "preservation_strategy"},
-                            {"source": "preservation_strategy", "target": "action_response"}
+                            {"source": "monitoring_requirements", "target": "sensor_fusion"},
+                            {"source": "sensor_fusion", "target": "status_judgment"},
+                            {"source": "status_judgment", "target": "anomaly_classification"},
+                            {"source": "anomaly_classification", "target": "response_strategy"},
+                            {"source": "response_strategy", "target": "alert_logging"},
+                            {"source": "alert_logging", "target": "command_sync"},
+                            {"source": "response_strategy", "target": "sensor_fusion"}
                         ]
                     }
                 }
@@ -977,7 +1001,719 @@ SCENARIOS: List[Scenario] = [
             }
         },
     ),
+    Scenario(
+        id="offroad_logistics_strategy",  # 越野物流策略
+        model_name="越野物流",
+        name="越野物流策略",
+        example_input="（102,0）向位置X（190,100）运输2车冷链物资资源Y以及2车5kg食物与水，道路存在不确定损毁风险，要求2小时内送达。",
+        reasoning_chain="任务解析（距离、地形、载重、道路损毁程度）→ 车辆匹配（履带式/六轮越野无人车，理由：通过性与稳定性）→ 装车方案（装载顺序、固定方式、重心配平、装载量分配）→ 行进策略推理（选择低速稳态模式、坡度敏感控制、涉水绕行策略、路径重规划）→ 风险规避与冗余方案（使用前置侦察无人机、设置备用路线、补能策略）→ 物流执行计划（运输批次、行进间隔、车队协同方式、车队/货物监控）→ 卸货操作（卸载方式、顺序安排、安全确认、交接流程）",
+        prompt=(
+            "【越野物流-越野物流策略专项要求】\n"
+            "1. 行为树必须至少包含以下核心节点，严格按照推理链条自上而下展开：\n"
+            "   - task_analysis（任务解析）：解析运输距离（从(102,0)到(190,100)）、地形类型、载重需求（冷链物资+食物与水）、道路损毁程度、时间约束（2小时）；\n"
+            "   - vehicle_matching（车辆匹配）：基于地形与载重特点，选择履带式或六轮越野无人车，说明通过性与稳定性的选择理由；\n"
+            "   - loading_plan（装车方案）：规划装载顺序、固定方式、重心配平与装载量分配，确保运输安全；\n"
+            "   - movement_strategy（行进策略推理，二级节点）：必须包含以下四个三级子节点：\n"
+            "       * low_speed_stable_mode（低速稳态模式）：坡度敏感的速度控制策略；\n"
+            "       * slope_sensitive_control（坡度敏感控制）：动力分配与制动策略；\n"
+            "       * water_crossing_bypass（涉水绕行策略）：水深检测与绕行决策；\n"
+            "       * path_replanning（路径重规划）：必须包含children以支持进一步展开，包含路径规划、异常感知与处理、重规划逻辑；\n"
+            "   - risk_mitigation（风险规避与冗余方案）：包含前置侦察无人机配置、备用路线设置、补能策略规划；\n"
+            "   - logistics_execution_plan（物流执行计划，核心决策节点）：必须包含以下子节点：\n"
+            "       * transport_batches（运输批次）：批次划分与调度；\n"
+            "       * convoy_interval（行进间隔）：车间距与跟随策略；\n"
+            "       * fleet_coordination（车队协同方式）：必须包含children以支持进一步展开，包含编队规划与协同动作管理；\n"
+            "       * fleet_cargo_monitoring（车队/货物状态监控）：必须包含children以支持进一步展开，包含监控、传感器融合、状态判别、异常处理、告警记录；\n"
+            "       必须包含 knowledge_graph 字段。\n"
+            "   - unloading_operation（卸货操作）：规划卸载方式、顺序安排、安全确认与交接流程。\n"
+            "2. logistics_execution_plan 节点的 knowledge_graph 必须体现完整因果链路：\n"
+            "   任务解析 → 车辆匹配 → 装车方案 → 行进策略推理 → 风险规避 → 物流执行计划 → 卸货操作。\n"
+            "3. 在 node_insights 中：\n"
+            "   - movement_strategy 节点必须包含 knowledge_graph，体现四个子策略的关系；\n"
+            "   - path_replanning 节点必须包含 knowledge_graph，体现路径规划→异常感知→重规划的链路；\n"
+            "   - fleet_coordination 节点必须包含 knowledge_graph，体现编队规划→协同动作管理的链路；\n"
+            "   - fleet_cargo_monitoring 节点必须包含 knowledge_graph，体现监控→融合→判别→处理→告警的链路；\n"
+            "   - 所有节点的 knowledge_trace 体现完整推理路径。"
+        ),
+        example_output={
+            "default_focus": "logistics_execution_plan",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "🚛 任务解析：越野物流运输任务",
+                "status": "completed",
+                "summary": "解析从(102,0)向位置X(190,100)运输2车冷链物资资源Y及2车5kg食物与水的任务，道路存在不确定损毁风险，要求2小时内送达。运输距离约110km，需考虑冷链温控与道路风险。",
+                "children": [
+                    {
+                        "id": "vehicle_matching",
+                        "label": "🚗 车辆匹配：4辆六轮越野无人车",
+                        "status": "completed",
+                        "summary": "基于110km运输距离、2小时时限与道路损毁风险，选择4辆六轮越野无人车（2辆配备冷链设备运输冷链物资，2辆运输食物与水），理由：六轮设计具备良好通过性与稳定性，最高时速60km/h可满足时限要求。",
+                        "children": []
+                    },
+                    {
+                        "id": "loading_plan",
+                        "label": "📦 装车方案",
+                        "status": "completed",
+                        "summary": "规划装载顺序（冷链物资优先装载并启动制冷，食物与水按重量分配）、固定方式（绑扎带+防滑垫+限位挡板）、重心配平（前后6:4，左右对称）、装载量分配（冷链车各50kg，普通车各5kg食物与水）。",
+                        "children": [
+                            {
+                                "id": "loading_sequence",
+                                "label": "装载顺序",
+                                "status": "completed",
+                                "summary": "重物在下轻物在上，冷链物资需优先装载并预冷，食物与水按密封防潮要求装载。",
+                        "children": []
+                            },
+                            {
+                                "id": "fixing_method",
+                                "label": "固定方式",
+                                "status": "completed",
+                                "summary": "采用高强度绑扎带（承载力>500kg）+防滑垫（摩擦系数>0.6）+限位挡板组合固定。",
+                                "children": []
+                            },
+                            {
+                                "id": "weight_balance",
+                                "label": "重心配平",
+                                "status": "completed",
+                                "summary": "前后重量比6:4提升爬坡稳定性，左右严格对称（偏差<5%）。",
+                                "children": []
+                            },
+                            {
+                                "id": "load_distribution",
+                                "label": "装载量分配",
+                                "status": "completed",
+                                "summary": "2辆冷链车各装载冷链物资约50kg，2辆普通车各装载5kg食物与水。",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "id": "movement_strategy",
+                        "label": "🛤️ 行进策略推理",
+                        "status": "completed",
+                        "summary": "生成包含低速稳态模式、坡度敏感控制、涉水绕行策略与路径重规划的多层次行进策略，确保在道路损毁风险下安全高效完成运输。",
+                        "children": [
+                            {
+                                "id": "low_speed_stable_mode",
+                                "label": "🐢 低速稳态模式",
+                                "status": "completed",
+                                "summary": "当坡度>15°或路面附着系数<0.4时，自动切换至低速档（10km/h），增加牵引力与稳定性，保护冷链货物免受剧烈颠簸。",
+                        "children": []
+                            },
+                            {
+                                "id": "slope_sensitive_control",
+                                "label": "⛰️ 坡度敏感控制",
+                                "status": "completed",
+                                "summary": "实时监测坡度传感器，动态调整六轮动力分配比例：上坡时后轮驱动力增加30%，下坡时启用制动能量回收并限速至15km/h。",
+                                "children": []
+                            },
+                            {
+                                "id": "water_crossing_bypass",
+                                "label": "💧 涉水绕行策略",
+                                "status": "completed",
+                                "summary": "当检测到水深>40cm或水流速度>1.5m/s时，自动触发绕行规划，优先选择上游浅滩或桥梁通道，避免涉水导致货物受损或车辆故障。",
+                                "children": []
+                            },
+                            {
+                                "id": "path_replanning",
+                                "label": "🔄 路径重规划",
+                                "status": "completed",
+                                "summary": "基于实时感知的障碍信息，综合车队状态、地图与异常信息生成新的可行路径。支持进一步展开查看详细规划逻辑。",
+                                "children": [
+                                    {
+                                        "id": "path_planning_base",
+                                        "label": "📍 路径规划（基础）",
+                                        "status": "completed",
+                                        "summary": "基于高精度地图与实时路况信息，规划从(102,0)到(190,100)的最优路径，预计行驶距离110km，预估耗时1.5小时（含安全余量）。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "anomaly_perception",
+                                        "label": "👁️ 异常感知与处理",
+                                        "status": "completed",
+                                        "summary": "当感知数据出现异常（如前方道路塌方、积水、障碍物）时，派遣机器狗抵近观察，获取精确障碍信息与可通行性评估。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "dynamic_replanning",
+                                        "label": "🔀 动态重规划",
+                                        "status": "completed",
+                                        "summary": "综合车队当前位置、剩余电量、货物状态、地图信息与异常感知结果，实时计算最优替代路径，重规划决策时间<30秒。",
+                                        "children": []
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "id": "risk_mitigation",
+                        "label": "⚠️ 风险规避与冗余方案",
+                        "status": "completed",
+                        "summary": "配置2架前置侦察无人机（提前1km探测路况）、设置3条备用路线（主路线+2条备选）、规划中途补能点（每30km设置一个快速充电站）。",
+                        "children": [
+                            {
+                                "id": "scout_uav",
+                                "label": "🚁 前置侦察无人机",
+                                "status": "completed",
+                                "summary": "2架小型旋翼无人机提前1km探测路况，飞行高度80m，可识别塌方、积水、倾倒树木等障碍，实时回传视频与地形数据。",
+                        "children": []
+                            },
+                            {
+                                "id": "backup_routes",
+                                "label": "🗺️ 备用路线设置",
+                                "status": "completed",
+                                "summary": "主路线（最短距离110km）+备选路线A（绕行增加15km但避开高风险区域）+备选路线B（应急路线，适合单车通过），路线切换决策时间<2分钟。",
+                                "children": []
+                            },
+                            {
+                                "id": "energy_strategy",
+                                "label": "🔋 补能策略",
+                                "status": "completed",
+                                "summary": "每30km设置快速充电站，单次补能时间10分钟可恢复50%电量，确保车辆在2小时内完成往返任务。",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "id": "logistics_execution_plan",
+                        "label": "✅ 物流执行计划",
+                        "status": "active",
+                        "summary": "制定运输方案：4辆车编队出发，车间距保持150m，采用梯队协同模式，实时监控车队与货物状态，预计1.5小时完成运输，满足2小时时限要求。",
+                        "children": [
+                            {
+                                "id": "transport_batches",
+                                "label": "📋 运输批次",
+                                "status": "completed",
+                                "summary": "本次任务为单批次运输：4辆车同时出发，2辆冷链车+2辆普通车编队行进，单批次总载重约110kg。",
+                        "children": []
+                            },
+                            {
+                                "id": "convoy_interval",
+                                "label": "📏 行进间隔",
+                                "status": "completed",
+                                "summary": "车队内车间距保持150m（约15秒行进时间差），避免连环事故，便于单车机动与故障处置，同时保持通信稳定。",
+                                "children": []
+                            },
+                            {
+                                "id": "fleet_coordination",
+                                "label": "🤝 车队协同方式",
+                                "status": "completed",
+                                "summary": "采用梯队协同模式，支持进一步展开查看编队规划与协同动作管理详情。",
+                                "children": [
+                                    {
+                                        "id": "formation_planning",
+                                        "label": "📐 行进编队规划",
+                                        "status": "completed",
+                                        "summary": "依据道路宽度选择队形：宽路段（>6m）采用双列并行（冷链车在内侧），窄路段（<6m）切换为单列纵队，前车负责探路与障碍标记。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "coordination_actions",
+                                        "label": "🔄 协同动作管理",
+                                        "status": "completed",
+                                        "summary": "依据道路宽度与障碍情况，组织依序掉头（窄路）或队列整体倒置（宽路），支持动态队形调整与紧急避让协同。",
+                                        "children": []
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "fleet_cargo_monitoring",
+                                "label": "📊 车队/货物状态监控",
+                                "status": "completed",
+                                "summary": "实时监控车队运行情况与货物状态，自动识别异常并生成告警与应对策略。支持进一步展开查看监控详情。",
+                                "children": [
+                                    {
+                                        "id": "monitoring_requirements",
+                                        "label": "📋 监控需求解析",
+                                        "status": "completed",
+                                        "summary": "监控项目包括：车辆状态（位置、速度、电量）、冷链温度（目标-18°C±2°C）、振动水平（加速度<2g）、能耗率（kWh/km）。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "sensor_data_fusion",
+                                        "label": "📡 传感器数据融合",
+                                        "status": "completed",
+                                        "summary": "融合温度传感器、车载健康监测系统、GPS定位、IMU惯性测量单元数据，采样频率10Hz，数据融合延迟<100ms。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "status_determination",
+                                        "label": "🔍 状态判别",
+                                        "status": "completed",
+                                        "summary": "实时检测异常状态：温度偏离（冷链温度>-16°C或<-20°C）、电量不足（<20%）、路线偏移（>50m）、振动异常（>3g持续5秒）。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "anomaly_handling",
+                                        "label": "🛠️ 异常处理策略",
+                                        "status": "completed",
+                                        "summary": "针对不同异常采取对应措施：温度异常→启动备用制冷/降速保温；电量不足→导航至最近补能点；路线偏移→自动纠偏/重规划；振动异常→降速并检查货物固定。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "alert_logging",
+                                        "label": "🚨 告警与记录",
+                                        "status": "completed",
+                                        "summary": "生成异常提示与任务执行日志，实时同步至指挥端。告警分级：一般（黄色）、紧急（橙色）、严重（红色），日志包含时间戳、位置、异常类型、处理措施。",
+                                        "children": []
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "id": "unloading_operation",
+                        "label": "📤 卸货操作",
+                        "status": "pending",
+                        "summary": "到达位置X(190,100)后，采用逐车卸载方式（冷链车优先），自动卸载装置配合人工辅助，进行货物清点与完整性确认，完成交接签收并记录。",
+                        "children": [
+                            {
+                                "id": "unloading_method",
+                                "label": "卸载方式",
+                                "status": "pending",
+                                "summary": "采用自动液压尾板+人工辅助的方式，单车卸载时间约3分钟，冷链物资需在制冷环境下快速转移。",
+                                "children": []
+                            },
+                            {
+                                "id": "unloading_sequence",
+                                "label": "顺序安排",
+                                "status": "pending",
+                                "summary": "优先卸载冷链物资（保持冷链不断），其次卸载食物与水，确保货物品质不受影响。",
+                                "children": []
+                            },
+                            {
+                                "id": "safety_confirmation",
+                                "label": "安全确认",
+                                "status": "pending",
+                                "summary": "卸载过程中检查货物外包装完整性、冷链温度记录（确认全程-18°C±2°C）、食物密封状态，发现异常立即记录。",
+                                "children": []
+                            },
+                            {
+                                "id": "handover_process",
+                                "label": "交接流程",
+                                "status": "pending",
+                                "summary": "按货物清单逐项清点，使用扫码设备核对，与接收人员完成电子签名交接，生成完整运输记录回传指挥端。",
+                        "children": []
+                            }
+                        ]
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务解析",
+                    "summary": "从任务文本中提取起点(102,0)、终点(190,100)、运输距离约110km、货物类型（冷链物资+食物与水）、时间约束（2小时）以及道路损毁风险。",
+                    "key_points": [
+                        "起点坐标(102,0)，终点位置X坐标(190,100)，直线距离约110km",
+                        "货物组成：2车冷链物资资源Y（需温控-18°C）+ 2车5kg食物与水（常温运输）",
+                        "时间约束：2小时内送达，平均速度需>55km/h",
+                        "风险因素：道路存在不确定损毁风险，需预留备用路线与应急方案"
+                    ],
+                    "knowledge_trace": "任务文本 → 坐标/距离/货物/时限/风险要素提取 → 形成任务约束条件 → 为后续车辆匹配与策略生成提供输入。"
+                },
+                "vehicle_matching": {
+                    "title": "车辆匹配",
+                    "summary": "基于110km运输距离、2小时时限与冷链+常温混合货物需求，选择4辆六轮越野无人车的编队方案。",
+                    "key_points": [
+                        "六轮越野无人车：最高时速60km/h，续航150km，具备良好通过性（爬坡能力30°，涉水深度50cm）",
+                        "冷链配置：2辆车配备车载制冷系统（制冷能力-25°C~5°C可调），满足冷链物资温控需求",
+                        "载重能力：单车载重能力80kg，4车总载重320kg，满足110kg货物运输需求并保留190kg冗余",
+                        "选择理由：六轮设计比履带式速度快40%，可满足2小时时限；比四轮稳定性更好，适应道路损毁风险"
+                    ],
+                    "knowledge_trace": "运输距离+时限约束 → 速度需求推算 → 货物类型分析 → 选择六轮越野无人车 → 配置冷链设备 → 验证载重与续航能力。"
+                },
+                "loading_plan": {
+                    "title": "装车方案",
+                    "summary": "基于4辆六轮越野无人车的载重能力与冷链/常温混合货物特性，制定科学的装载方案。",
+                    "key_points": [
+                        "装载顺序原则：冷链物资优先装载并启动预冷（提前30分钟），食物与水按密封防潮要求后装",
+                        "固定方式：高强度绑扎带（承载力>500kg）+ 防滑垫（摩擦系数>0.6）+ 限位挡板，冷链货物增加保温层固定",
+                        "重心配平：前后重量比6:4（提升爬坡稳定性），左右对称（偏差<5%），冷链车制冷设备重量纳入配平计算",
+                        "装载量分配：2辆冷链车各装载约50kg冷链物资，2辆普通车各装载2.5kg食物与2.5kg水，总载重约110kg",
+                        "装载时间：单车装载时间约10分钟，4车并行装载+检查共计20分钟"
+                    ],
+                    "knowledge_trace": "车辆载重能力 + 货物类型与重量 → 装载顺序设计 → 固定方式选择 → 重心配平计算 → 装载量分配 → 时间规划。"
+                },
+                "movement_strategy": {
+                    "title": "行进策略推理",
+                    "summary": "针对道路损毁风险与冷链运输要求，设计包含低速稳态模式、坡度敏感控制、涉水绕行策略与路径重规划的多层次行进策略。",
+                    "key_points": [
+                        "低速稳态模式：坡度>15°或路面附着系数<0.4时自动降速至10km/h，保护冷链货物",
+                        "坡度敏感控制：实时调整六轮动力分配，上坡后轮增加30%驱动力，下坡限速15km/h并启用能量回收",
+                        "涉水绕行策略：水深>40cm或流速>1.5m/s时触发绕行，避免货物受损",
+                        "路径重规划：支持实时感知障碍并动态重规划，重规划决策时间<30秒"
+                    ],
+                    "knowledge_trace": "道路损毁风险 + 冷链保护需求 → 分析各类地形场景 → 设计四类应对策略 → 形成自适应行进方案。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "terrain_input", "label": "地形感知输入\n(坡度,附着系数,水深)", "type": "input"},
+                            {"id": "low_speed_mode", "label": "低速稳态模式\n(坡度>15°→10km/h)", "type": "process"},
+                            {"id": "slope_control", "label": "坡度敏感控制\n(动力分配,制动回收)", "type": "process"},
+                            {"id": "water_bypass", "label": "涉水绕行策略\n(水深>40cm→绕行)", "type": "process"},
+                            {"id": "path_replan", "label": "路径重规划\n(障碍感知→新路径)", "type": "decision"},
+                            {"id": "strategy_output", "label": "行进策略输出\n(速度,路径,动力)", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "terrain_input", "target": "low_speed_mode"},
+                            {"source": "terrain_input", "target": "slope_control"},
+                            {"source": "terrain_input", "target": "water_bypass"},
+                            {"source": "low_speed_mode", "target": "strategy_output"},
+                            {"source": "slope_control", "target": "strategy_output"},
+                            {"source": "water_bypass", "target": "path_replan"},
+                            {"source": "path_replan", "target": "strategy_output"}
+                        ]
+                    }
+                },
+                "low_speed_stable_mode": {
+                    "title": "低速稳态模式",
+                    "summary": "当检测到恶劣路况时自动切换至低速稳态行驶，保护货物并提升通过性。",
+                    "key_points": [
+                        "触发条件：坡度>15°、路面附着系数<0.4、颠簸加速度>2g",
+                        "执行动作：速度限制至10km/h，悬挂系统切换至软模式，增强减震效果",
+                        "冷链保护：低速模式下制冷系统功率提升10%，补偿颠簸导致的密封性能下降",
+                        "退出条件：连续5秒路况恢复正常后，逐步恢复至正常速度（每秒增加5km/h）"
+                    ],
+                    "knowledge_trace": "路况传感器数据 → 触发条件判断 → 速度与悬挂调整 → 冷链补偿 → 条件恢复后逐步退出。"
+                },
+                "slope_sensitive_control": {
+                    "title": "坡度敏感控制",
+                    "summary": "根据实时坡度数据动态调整六轮动力分配与制动策略。",
+                    "key_points": [
+                        "坡度检测：IMU实时测量，精度±0.5°，采样频率100Hz",
+                        "上坡策略：坡度>10°时后轮驱动力增加30%，坡度>20°时前后轮驱动力比调整为4:6",
+                        "下坡策略：坡度>10°时自动限速至15km/h，启用制动能量回收（回收效率约25%）",
+                        "极限保护：坡度>30°时触发停车警告，等待人工确认或自动规划绕行路线"
+                    ],
+                    "knowledge_trace": "IMU坡度测量 → 坡度区间判断 → 动力分配调整/制动策略切换 → 极限保护触发。"
+                },
+                "water_crossing_bypass": {
+                    "title": "涉水绕行策略",
+                    "summary": "基于水深与流速检测，自动决策涉水通过或绕行。",
+                    "key_points": [
+                        "检测手段：超声波水深传感器（精度±5cm）+ 视觉流速估计（精度±0.3m/s）",
+                        "安全阈值：涉水深度<40cm且流速<1.5m/s可通过，否则触发绕行",
+                        "绕行决策：优先选择上游浅滩（通常水深较浅），次选桥梁通道，最后选择远距离绕行",
+                        "涉水保护：若必须涉水，速度限制至5km/h，启用防水密封，涉水后自动检测车辆状态"
+                    ],
+                    "knowledge_trace": "水深/流速检测 → 安全阈值比较 → 绕行决策/涉水通过 → 执行保护措施。"
+                },
+                "path_replanning": {
+                    "title": "路径重规划",
+                    "summary": "基于实时感知的障碍信息，综合车队状态与地图数据生成新的可行路径。",
+                    "key_points": [
+                        "触发条件：前方障碍物阻断当前路径、道路损毁超出通行能力、涉水绕行需求",
+                        "信息融合：综合侦察无人机数据、车载传感器、机器狗抵近观察结果、高精度地图",
+                        "重规划算法：基于A*算法的快速路径搜索，考虑距离、坡度、路况权重，决策时间<30秒",
+                        "车队协同：重规划结果同步至所有车辆，支持分段执行与汇合点设定"
+                    ],
+                    "knowledge_trace": "障碍感知触发 → 多源信息融合 → 路径搜索算法 → 最优路径输出 → 车队同步执行。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "path_base", "label": "路径规划（基础）\n(地图,路况)", "type": "input"},
+                            {"id": "anomaly_detect", "label": "异常感知与处理\n(感知异常→机器狗抵近)", "type": "process"},
+                            {"id": "info_fusion", "label": "信息融合\n(车队状态+地图+异常)", "type": "process"},
+                            {"id": "replan_algo", "label": "重规划算法\n(A*路径搜索)", "type": "decision"},
+                            {"id": "new_path", "label": "新路径输出\n(最优替代路径)", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "path_base", "target": "anomaly_detect"},
+                            {"source": "anomaly_detect", "target": "info_fusion"},
+                            {"source": "info_fusion", "target": "replan_algo"},
+                            {"source": "replan_algo", "target": "new_path"},
+                            {"source": "path_base", "target": "info_fusion"}
+                        ]
+                    }
+                },
+                "path_planning_base": {
+                    "title": "路径规划（基础）",
+                    "summary": "基于高精度地图与实时路况，规划从起点到终点的最优路径。",
+                    "key_points": [
+                        "地图数据：使用1:10000高精度地图，包含道路等级、坡度、路面类型、历史损毁记录",
+                        "路况信息：实时获取卫星影像与历史通行数据，标注高风险区域",
+                        "路径计算：综合距离、时间、安全性三维权重，生成主路径与2条备选路径",
+                        "预估参数：主路径110km，预计1.5小时，平均速度约73km/h，安全系数0.85"
+                    ],
+                    "knowledge_trace": "高精度地图 + 实时路况 → 多维权重计算 → 主路径+备选路径生成 → 预估时间与安全系数。"
+                },
+                "anomaly_perception": {
+                    "title": "异常感知与处理",
+                    "summary": "当感知数据出现异常时，派遣机器狗抵近观察获取精确信息。",
+                    "key_points": [
+                        "异常检测：前方道路影像与地图不符、障碍物体积超出通行空间、路面反射异常（可能积水）",
+                        "机器狗派遣：从队尾释放机器狗，行进至异常点前方20m进行抵近观察",
+                        "观察内容：障碍物尺寸与材质、路面承载能力、积水深度、可通行宽度",
+                        "信息回传：机器狗采集数据实时回传（延迟<500ms），供重规划决策使用"
+                    ],
+                    "knowledge_trace": "车载传感器异常检测 → 机器狗派遣 → 抵近观察与数据采集 → 信息回传至车队。"
+                },
+                "dynamic_replanning": {
+                    "title": "动态重规划",
+                    "summary": "综合车队状态、地图与异常信息，实时计算最优替代路径。",
+                    "key_points": [
+                        "输入信息：车队当前位置（GPS精度<1m）、剩余电量（4车平均值）、货物状态（温度、振动）、障碍详情",
+                        "约束条件：新路径必须满足2小时时限、不超过车辆续航能力、避开所有已知障碍",
+                        "算法执行：基于A*的增量式路径搜索，复用已通过路段，仅重算前方路径，计算时间<30秒",
+                        "输出结果：新路径坐标序列、预估到达时间、风险评级，同步至所有车辆导航系统"
+                    ],
+                    "knowledge_trace": "多源信息输入 → 约束条件设定 → A*增量搜索 → 新路径验证 → 车队同步。"
+                },
+                "risk_mitigation": {
+                    "title": "风险规避与冗余方案",
+                    "summary": "通过前置侦察、多路径规划与补能保障，构建多层次的风险防控体系。",
+                    "key_points": [
+                        "前置侦察无人机：2架小型旋翼无人机提前1km探测，识别塌方/积水/障碍，实时回传",
+                        "备用路线：主路线+2条备选，路线切换决策时间<2分钟",
+                        "补能策略：每30km设置快速充电站，10分钟恢复50%电量",
+                        "通信冗余：4G/5G+卫星通信双备份，确保指挥端持续监控"
+                    ],
+                    "knowledge_trace": "风险源识别 → 侦察手段部署 → 备选方案配置 → 补能与通信保障 → 形成多层防控体系。"
+                },
+                "logistics_execution_plan": {
+                    "title": "物流执行计划",
+                    "summary": "整合车辆配置、装车方案、行进策略与风险规避措施，生成完整的物流执行方案。",
+                    "key_points": [
+                        "编队配置：4辆六轮越野无人车（2冷链+2常温），单次运输110kg货物",
+                        "行进间隔：车间距150m，梯队协同模式，前车探路/中车主运/后车应急",
+                        "车队协同：支持动态队形切换（双列↔单列），协同避障与紧急制动",
+                        "状态监控：实时监控车辆状态与冷链温度，异常自动告警并同步指挥端",
+                        "时间规划：装车20分钟+行进90分钟+卸货20分钟=130分钟，满足2小时时限"
+                    ],
+                    "knowledge_trace": "车辆配置 + 装车方案 + 行进策略 + 风险措施 → 编队与间隔设计 → 协同与监控方案 → 时间规划验证 → 形成可执行物流方案。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "task_parsing", "label": "任务解析\n((102,0)→(190,100),冷链+常温,2h)", "type": "input"},
+                            {"id": "vehicle_match", "label": "车辆匹配\n(4辆六轮越野,2冷链+2常温)", "type": "process"},
+                            {"id": "loading", "label": "装车方案\n(顺序,固定,配平,分配)", "type": "process"},
+                            {"id": "movement", "label": "行进策略推理\n(低速稳态,坡度控制,涉水绕行,路径重规划)", "type": "process"},
+                            {"id": "risk", "label": "风险规避\n(侦察无人机,备用路线,补能点)", "type": "process"},
+                            {"id": "execution", "label": "物流执行计划\n(批次,间隔,协同,监控)", "type": "decision"},
+                            {"id": "unloading", "label": "卸货操作\n(方式,顺序,确认,交接)", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "task_parsing", "target": "vehicle_match"},
+                            {"source": "vehicle_match", "target": "loading"},
+                            {"source": "loading", "target": "movement"},
+                            {"source": "movement", "target": "risk"},
+                            {"source": "risk", "target": "execution"},
+                            {"source": "execution", "target": "unloading"},
+                            {"source": "task_parsing", "target": "execution"}
+                        ]
+                    }
+                },
+                "transport_batches": {
+                    "title": "运输批次",
+                    "summary": "根据任务需求与车辆配置，确定本次为单批次运输任务。",
+                    "key_points": [
+                        "批次数量：单批次（4辆车同时出发，无需分批）",
+                        "车辆分配：2辆冷链车运输冷链物资Y，2辆普通车运输食物与水",
+                        "总载重：约110kg（冷链物资100kg + 食物与水10kg）",
+                        "时间节点：装车完成后统一发车，预计1.5小时后同时到达"
+                    ],
+                    "knowledge_trace": "任务载重需求 → 车辆数量匹配 → 批次划分决策 → 时间节点规划。"
+                },
+                "convoy_interval": {
+                    "title": "行进间隔",
+                    "summary": "设定车队内部的安全间距与跟随策略。",
+                    "key_points": [
+                        "标准间距：150m（约15秒行进时间差，正常速度60km/h）",
+                        "安全考量：避免连环事故，单车故障不影响后车通行",
+                        "通信要求：间距内保持稳定的V2V（车对车）通信，延迟<50ms",
+                        "动态调整：恶劣路况时间距增至200m，紧急情况允许缩短至100m"
+                    ],
+                    "knowledge_trace": "安全距离计算 → 通信能力评估 → 标准间距设定 → 动态调整规则。"
+                },
+                "fleet_coordination": {
+                    "title": "车队协同方式",
+                    "summary": "采用梯队协同模式，支持动态队形调整与协同动作管理。",
+                    "key_points": [
+                        "编队模式：梯队协同（前车探路+中车主运+后车应急）",
+                        "队形切换：宽路双列并行，窄路单列纵队，切换时间<30秒",
+                        "协同动作：依序掉头、队列倒置、紧急避让、故障车辆绕行",
+                        "通信协议：基于V2V的实时位置与状态共享，决策同步延迟<100ms"
+                    ],
+                    "knowledge_trace": "道路条件评估 → 编队模式选择 → 队形切换规则 → 协同动作库 → 通信协议保障。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "road_condition", "label": "道路条件\n(宽度,障碍,路况)", "type": "input"},
+                            {"id": "formation_plan", "label": "行进编队规划\n(单列/双列队形)", "type": "process"},
+                            {"id": "coord_actions", "label": "协同动作管理\n(掉头,倒置,避让)", "type": "process"},
+                            {"id": "v2v_comm", "label": "V2V通信\n(位置,状态同步)", "type": "process"},
+                            {"id": "formation_output", "label": "编队执行\n(队形,间距,动作)", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "road_condition", "target": "formation_plan"},
+                            {"source": "formation_plan", "target": "coord_actions"},
+                            {"source": "coord_actions", "target": "formation_output"},
+                            {"source": "v2v_comm", "target": "formation_plan"},
+                            {"source": "v2v_comm", "target": "coord_actions"}
+                        ]
+                    }
+                },
+                "formation_planning": {
+                    "title": "行进编队规划",
+                    "summary": "依据道路宽度与路况，动态选择最优队形。",
+                    "key_points": [
+                        "宽路队形（>6m）：双列并行，冷链车在内侧（更安全），普通车在外侧",
+                        "窄路队形（<6m）：单列纵队，顺序为探路车→冷链车1→冷链车2→应急车",
+                        "队形切换：前车检测到道路变窄时提前500m发出切换指令，后车依次并入",
+                        "特殊队形：通过障碍区时可临时拉大间距至300m，通过后恢复标准间距"
+                    ],
+                    "knowledge_trace": "道路宽度检测 → 队形选择 → 切换指令发送 → 各车位置调整 → 新队形形成。"
+                },
+                "coordination_actions": {
+                    "title": "协同动作管理",
+                    "summary": "管理车队在特殊场景下的协同动作执行。",
+                    "key_points": [
+                        "依序掉头：窄路掉头时，从队尾开始依次掉头，前车等待后车完成后再掉头",
+                        "队列倒置：宽路掉头时，队列整体倒置（原队尾变队头），减少掉头时间",
+                        "紧急避让：前车检测到突发障碍时，广播紧急制动指令，各车同步减速避让",
+                        "故障绕行：某车故障时，后续车辆自动绕行并重新编队，故障车等待救援"
+                    ],
+                    "knowledge_trace": "场景识别 → 协同动作选择 → 指令广播 → 各车执行 → 队形恢复确认。"
+                },
+                "fleet_cargo_monitoring": {
+                    "title": "车队/货物状态监控",
+                    "summary": "实时监控车队运行情况与货物状态，自动识别异常并生成告警与应对策略。",
+                    "key_points": [
+                        "监控维度：车辆（位置/速度/电量/健康）、货物（温度/振动/完整性）",
+                        "数据采集：多传感器融合，采样频率10Hz，数据融合延迟<100ms",
+                        "异常检测：基于阈值与机器学习的双重检测机制",
+                        "告警机制：分级告警（一般/紧急/严重），实时同步指挥端",
+                        "应对策略：针对不同异常类型预设处理方案，自动执行或人工确认后执行"
+                    ],
+                    "knowledge_trace": "传感器数据采集 → 数据融合与分析 → 状态判别 → 异常检测 → 告警与处理。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "monitor_req", "label": "监控需求解析\n(车辆状态,温度,振动,能耗)", "type": "input"},
+                            {"id": "sensor_fusion", "label": "传感器数据融合\n(温度,GPS,IMU,健康监测)", "type": "process"},
+                            {"id": "status_judge", "label": "状态判别\n(温度异常,电量不足,偏移,振动)", "type": "process"},
+                            {"id": "anomaly_handle", "label": "异常处理策略\n(降速,换车,调路,检查)", "type": "decision"},
+                            {"id": "alert_log", "label": "告警与记录\n(分级告警,日志,指挥端同步)", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "monitor_req", "target": "sensor_fusion"},
+                            {"source": "sensor_fusion", "target": "status_judge"},
+                            {"source": "status_judge", "target": "anomaly_handle"},
+                            {"source": "anomaly_handle", "target": "alert_log"},
+                            {"source": "status_judge", "target": "alert_log"}
+                        ]
+                    }
+                },
+                "monitoring_requirements": {
+                    "title": "监控需求解析",
+                    "summary": "明确车队与货物状态监控的具体项目与指标。",
+                    "key_points": [
+                        "车辆状态：实时位置（GPS）、行驶速度、剩余电量、系统健康状态（电机/电池/传感器）",
+                        "冷链温度：目标-18°C±2°C，每30秒记录一次，超出范围立即告警",
+                        "振动监测：三轴加速度，阈值<2g（正常）/<3g（警告）/<5g（危险）",
+                        "能耗监测：实时功率与累计能耗，预测剩余续航里程"
+                    ],
+                    "knowledge_trace": "任务需求分析 → 监控项目确定 → 指标阈值设定 → 监控方案形成。"
+                },
+                "sensor_data_fusion": {
+                    "title": "传感器数据融合",
+                    "summary": "融合多种传感器数据，构建车队与货物状态的完整画像。",
+                    "key_points": [
+                        "传感器类型：温度传感器（精度±0.5°C）、GPS（精度<1m）、IMU（6轴）、车载健康监测OBD",
+                        "采样频率：位置与速度10Hz，温度0.03Hz，振动100Hz，健康状态1Hz",
+                        "融合算法：扩展卡尔曼滤波（EKF）融合多源数据，提升估计精度与鲁棒性",
+                        "输出格式：统一时间戳的车队状态向量，每100ms更新一次"
+                    ],
+                    "knowledge_trace": "多传感器数据采集 → 时间同步 → 卡尔曼滤波融合 → 状态向量输出。"
+                },
+                "status_determination": {
+                    "title": "状态判别",
+                    "summary": "基于融合数据实时判别车队与货物的运行状态。",
+                    "key_points": [
+                        "温度状态：正常（-20°C~-16°C）、警告（-22°C~-20°C或-16°C~-14°C）、异常（其他）",
+                        "电量状态：充足（>50%）、注意（20%~50%）、不足（<20%）",
+                        "路线状态：正常（偏移<10m）、偏离（10m~50m）、严重偏离（>50m）",
+                        "振动状态：正常（<2g）、警告（2g~3g）、危险（>3g持续5秒）"
+                    ],
+                    "knowledge_trace": "融合数据输入 → 各维度阈值判断 → 状态分类 → 综合状态评估。"
+                },
+                "anomaly_handling": {
+                    "title": "异常处理策略",
+                    "summary": "针对不同异常类型执行预设的应对策略。",
+                    "key_points": [
+                        "温度异常：升温→增加制冷功率/降速减少热量产生；降温过度→降低制冷功率",
+                        "电量不足：导航至最近补能点，同时降速节能（限速40km/h）",
+                        "路线偏移：自动纠偏返回规划路线，若无法纠偏则触发路径重规划",
+                        "振动异常：立即降速至10km/h，停车检查货物固定状态，确认安全后继续"
+                    ],
+                    "knowledge_trace": "异常类型识别 → 策略库匹配 → 执行方案生成 → 自动/人工确认执行。"
+                },
+                "alert_logging": {
+                    "title": "告警与记录",
+                    "summary": "生成分级告警并记录完整的任务执行日志。",
+                    "key_points": [
+                        "告警分级：一般（黄色，提示性）、紧急（橙色，需关注）、严重（红色，需立即处理）",
+                        "告警内容：时间戳、车辆ID、位置坐标、异常类型、当前值、阈值、建议措施",
+                        "日志记录：全程记录车队状态变化，异常事件详细记录，支持事后回溯分析",
+                        "指挥端同步：告警实时推送至指挥端（延迟<1秒），支持远程干预指令下发"
+                    ],
+                    "knowledge_trace": "异常检测 → 告警分级 → 告警生成与推送 → 日志记录 → 指挥端同步。"
+                },
+                "unloading_operation": {
+                    "title": "卸货操作",
+                    "summary": "在位置X(190,100)安全高效地完成货物卸载、清点确认与交接签收流程。",
+                    "key_points": [
+                        "卸载方式：自动液压尾板+人工辅助，单车卸载时间约3分钟",
+                        "卸载顺序：冷链物资优先（保持冷链不断），其次食物与水",
+                        "安全确认：检查外包装完整性、冷链温度记录、密封状态",
+                        "交接流程：扫码清点、电子签名、时间戳记录、数据回传指挥端"
+                    ],
+                    "knowledge_trace": "到达目的地 → 卸载方式选择 → 顺序执行卸载 → 状态检查 → 交接确认 → 记录回传。"
+                },
+                "unloading_method": {
+                    "title": "卸载方式",
+                    "summary": "采用自动化与人工辅助相结合的卸载方式。",
+                    "key_points": [
+                        "设备配置：每车配备自动液压尾板（承载能力100kg，升降行程1.2m）",
+                        "操作流程：车辆停稳→尾板展开→货物推出→尾板降至地面→人工接收",
+                        "冷链特殊处理：冷链车卸载时启动便携制冷设备，确保货物在转移过程中温度不超-15°C",
+                        "时间效率：单车卸载时间约3分钟，4车并行卸载+整理共计10分钟"
+                    ],
+                    "knowledge_trace": "卸载设备准备 → 尾板展开 → 货物转移 → 冷链保护 → 卸载完成确认。"
+                },
+                "unloading_sequence": {
+                    "title": "顺序安排",
+                    "summary": "根据货物特性安排合理的卸载顺序。",
+                    "key_points": [
+                        "优先级排序：冷链物资（时间敏感）> 食物（易腐） > 水（稳定）",
+                        "冷链优先原因：冷链物资脱离制冷环境后温度上升较快，需优先转移至接收方冷库",
+                        "并行策略：2辆冷链车同时卸载，完成后2辆普通车同时卸载",
+                        "异常处理：若某车卸载设备故障，优先处理冷链车，普通车可等待人工辅助"
+                    ],
+                    "knowledge_trace": "货物优先级评估 → 卸载顺序确定 → 并行策略制定 → 异常预案准备。"
+                },
+                "safety_confirmation": {
+                    "title": "安全确认",
+                    "summary": "在卸载过程中检查货物状态，确保运输质量。",
+                    "key_points": [
+                        "外观检查：货物外包装完整性，无破损、变形、渗漏",
+                        "冷链验证：核对温度记录曲线，确认全程-18°C±2°C，无断链情况",
+                        "密封检查：食物与水的密封包装完好，无进水或污染迹象",
+                        "异常记录：发现任何异常立即拍照存档，记录具体情况，通知接收方"
+                    ],
+                    "knowledge_trace": "外观检查 → 温度验证 → 密封检查 → 异常记录 → 检查结果汇总。"
+                },
+                "handover_process": {
+                    "title": "交接流程",
+                    "summary": "与接收方完成正式的货物交接手续。",
+                    "key_points": [
+                        "清点核对：使用扫码设备核对货物条码与清单，逐项确认数量与类型",
+                        "签收确认：接收方通过移动终端进行电子签名，系统自动记录时间戳",
+                        "文档生成：自动生成交接单（货物明细、状态、时间、签收人），双方各留存一份",
+                        "数据回传：交接完成后，完整运输记录（含温度曲线、行驶轨迹、异常事件）回传指挥端"
+                    ],
+                    "knowledge_trace": "货物清点 → 电子签收 → 文档生成 → 数据回传 → 任务闭环。"
+                }
+            }
+        },
+    ),
 
+
+    
     # 二、设备投放支援模型测试（7~12）
     Scenario(
         id="equipment_fleet_formation",  # 5. 任务编组
@@ -1105,98 +1841,137 @@ SCENARIOS: List[Scenario] = [
         id="equipment_precision_location",  # 6. 高精度目标定位
         model_name="设备投放",
         name="高精度目标定位",
-        example_input="向X区域精确投放传感器Y",
+        example_input="向X区域精确投放设备传感器Y",
         reasoning_chain="环境解析（读取地图、地物特征、遮挡信息）→ 传感器融合定位（无人机视觉、激光雷达、深度感知等多源数据融合）→ 误差纠正（基于航迹、风场、地面标志物进行偏差修正）→ 定位结果生成（输出目标区域精确坐标）",
         prompt=(
             "【设备投放-高精度目标定位专项要求】\n"
-            "1. 行为树必须包含：environment_analysis（读取地图、地物特征、遮挡信息）→ "
+            "1. 行为树必须包含：task_ingest（任务接收）→ environment_analysis（读取地图、地物特征、遮挡信息）→ "
             "sensor_fusion（多源数据融合：视觉、激光雷达、深度感知）→ "
             "error_correction（基于航迹、风场、地面标志物进行偏差修正）→ "
             "location_result（输出精确坐标，包含 knowledge_graph）。\n"
-            "2. location_result 的 knowledge_graph 应体现：环境解析 → 多源融合 → 误差纠正 → 坐标输出。"
+            "2. location_result 的 knowledge_graph 应体现完整推理链：环境解析 → 多源传感器融合 → 误差纠正 → 精确坐标输出。"
         ),
         example_output={
             "default_focus": "location_result",
             "behavior_tree": {
-                "id": "environment_analysis",
-                "label": "🗺️ 环境解析",
+                "id": "task_ingest",
+                "label": "📋 任务接收",
                 "status": "completed",
-                "summary": "读取X区域的地图、地物特征与遮挡情况，圈定可能的目标投放区域。",
+                "summary": "接收精确投放传感器Y至X区域的任务，解析投放精度要求。",
                 "children": [
                     {
-                        "id": "sensor_fusion",
-                        "label": "传感器融合定位",
-                        "status": "completed",
-                        "summary": "融合无人机视觉、激光雷达与深度感知数据，对预设标记与地物特征进行联合识别。",
-                        "children": []
-                    },
-                    {
-                        "id": "error_correction",
-                        "label": "误差纠正",
-                        "status": "completed",
-                        "summary": "利用航迹、风场和地面标志物对候选投放点坐标进行偏差修正。",
-                        "children": []
-                    },
-                    {
-                        "id": "location_result",
-                        "label": "✅ 定位结果生成",
+                        "id": "precision_location_sequence",
+                        "label": "🎯 高精度目标定位",
                         "status": "active",
-                        "summary": "输出目标区域的精确坐标，用于后续投放或导航控制模块。",
-                        "children": []
+                        "summary": "通过多源传感器融合与误差纠正，实现目标点的高精度定位。",
+                        "children": [
+                            {
+                                "id": "environment_analysis",
+                                "label": "🗺️ 环境解析",
+                                "status": "completed",
+                                "summary": "读取X区域的地图、地物特征与遮挡情况，圈定可能的目标投放区域。",
+                                "children": []
+                            },
+                            {
+                                "id": "sensor_fusion",
+                                "label": "📡 传感器融合定位",
+                                "status": "completed",
+                                "summary": "融合无人机视觉、激光雷达与深度感知数据，对预设标记进行识别与空间定位。",
+                                "children": []
+                            },
+                            {
+                                "id": "error_correction",
+                                "label": "🔧 误差纠正",
+                                "status": "completed",
+                                "summary": "利用航迹、风场模型和地面标志物对初始定位结果进行偏差修正。",
+                                "children": []
+                            },
+                            {
+                                "id": "location_result",
+                                "label": "✅ 定位结果生成",
+                                "status": "active",
+                                "summary": "输出目标区域的精确坐标（WGS84），附带精度评估指标，用于后续投放控制。",
+                                "children": []
+                            }
+                        ]
                     }
                 ]
             },
             "node_insights": {
+                "task_ingest": {
+                    "title": "任务接收",
+                    "summary": "接收并解析精确投放任务，明确传感器Y的投放目标区域X及精度要求。",
+                    "key_points": [
+                        "解析任务描述中的目标区域X和待投放设备Y",
+                        "提取投放精度要求（如±1米、±5米等）",
+                        "确认无人机平台的传感器配置与定位能力"
+                    ],
+                    "knowledge_trace": "任务文本 → 关键要素提取 → 精度需求明确 → 传感器能力匹配。"
+                },
+                "precision_location_sequence": {
+                    "title": "高精度目标定位序列",
+                    "summary": "通过环境解析、多源融合、误差纠正的顺序流程，实现目标点的高精度定位。",
+                    "key_points": [
+                        "分步骤执行：环境感知 → 多源融合 → 误差校正 → 结果输出",
+                        "各步骤相互依赖，后续步骤基于前序结果进行优化",
+                        "确保定位精度满足投放任务要求"
+                    ],
+                    "knowledge_trace": "顺序执行定位流程 → 逐步提升定位精度 → 输出可靠坐标。"
+                },
                 "environment_analysis": {
                     "title": "环境解析",
                     "summary": "通过地图与感知数据，识别X区域的关键地物、遮挡物和候选目标区域。",
                     "key_points": [
                         "从电子地图中提取道路、建筑物、水体等基础地物特征",
                         "结合任务预设标记的大致位置缩小搜索范围",
-                        "识别高遮挡区域，为后续传感器视角规划提供参考"
+                        "识别高遮挡区域（树木、建筑物阴影），为传感器视角规划提供参考",
+                        "评估地形起伏与可达性，排除不适合投放的区域"
                     ],
-                    "knowledge_trace": "地图与先验信息 → 地物特征提取 → 候选目标区域圈定。"
+                    "knowledge_trace": "地图与先验信息 → 地物特征提取 → 遮挡分析 → 候选目标区域圈定。"
                 },
                 "sensor_fusion": {
                     "title": "传感器融合定位",
-                    "summary": "利用视觉、激光雷达与深度传感器联合识别预设标记，并估算其相对位置。",
+                    "summary": "利用视觉、激光雷达与深度传感器联合识别预设标记，并估算其空间位置。",
                     "key_points": [
-                        "视觉模块检测地面或建筑表面的预设标记图案",
-                        "激光雷达提供三维点云以刻画空间结构和障碍物",
-                        "深度感知补充距离信息，提升目标位置估计的精度"
+                        "视觉模块检测地面或建筑表面的预设标记图案（如二维码、特征标志物）",
+                        "激光雷达提供三维点云以刻画空间结构和障碍物位置",
+                        "深度感知补充距离信息，提升目标位置估计的精度",
+                        "采用卡尔曼滤波或粒子滤波进行多源数据融合"
                     ],
-                    "knowledge_trace": "多源数据对齐 → 特征级或决策级融合 → 输出目标的初始空间位置估计。"
+                    "knowledge_trace": "多源数据采集 → 时空对齐 → 特征级或决策级融合 → 输出目标的初始空间位置估计。"
                 },
                 "error_correction": {
                     "title": "误差纠正",
                     "summary": "结合无人机航迹、风场估计与地面标志物位置，修正初始定位误差。",
                     "key_points": [
-                        "利用历史航迹和IMU/GNSS数据对定位漂移进行估计",
+                        "利用历史航迹和IMU/GNSS数据对定位漂移进行估计与补偿",
                         "将风场对无人机姿态与轨迹的影响纳入误差模型",
-                        "使用已知坐标的地面标志物进行绝对坐标对齐"
+                        "使用已知坐标的地面标志物（如GPS基站、预设信标）进行绝对坐标对齐",
+                        "基于多次观测进行统计滤波，降低随机误差"
                     ],
-                    "knowledge_trace": "初始定位结果 → 引入航迹与风场模型 → 与地面标志物对齐 → 得到修正后坐标。"
+                    "knowledge_trace": "初始定位结果 → 引入航迹与风场模型 → 与地面标志物对齐 → 统计滤波 → 得到修正后坐标。"
                 },
                 "location_result": {
                     "title": "定位结果生成",
-                    "summary": "在误差纠正后的基础上，输出可用于后续任务的目标区域精确坐标。",
+                    "summary": "在误差纠正后的基础上，输出可用于后续投放任务的目标区域精确坐标与精度指标。",
                     "key_points": [
-                        "将修正后的目标位置转换为统一坐标系（如WGS84或本地平面坐标）",
-                        "附带定位精度评估指标（如误差椭圆或置信区间）",
-                        "为投放控制或导航系统提供接口友好的数据结构"
+                        "将修正后的目标位置转换为统一坐标系（如WGS84或本地平面坐标系）",
+                        "附带定位精度评估指标（如误差椭圆、置信区间、CEP值）",
+                        "为投放控制系统提供标准化接口（JSON格式：坐标、精度、时间戳）",
+                        "记录定位过程的关键参数（传感器状态、融合权重、修正量）供审计使用"
                     ],
                     "knowledge_trace": "修正后空间位置 → 坐标系转换与精度评估 → 输出标准化定位结果。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "env_analysis", "label": "环境解析", "type": "input"},
-                            {"id": "fusion", "label": "多源传感器融合", "type": "process"},
-                            {"id": "correction", "label": "误差纠正", "type": "process"},
-                            {"id": "coord_output", "label": "坐标输出", "type": "output"}
+                            {"id": "env_analysis", "label": "环境解析\n(地图+地物+遮挡)", "type": "input"},
+                            {"id": "sensor_fusion", "label": "多源传感器融合\n(视觉+激光雷达+深度)", "type": "process"},
+                            {"id": "error_correction", "label": "误差纠正\n(航迹+风场+标志物)", "type": "process"},
+                            {"id": "coord_output", "label": "精确坐标输出\n(WGS84+精度指标)", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "env_analysis", "target": "fusion"},
-                            {"source": "fusion", "target": "correction"},
-                            {"source": "correction", "target": "coord_output"}
+                            {"source": "env_analysis", "target": "sensor_fusion"},
+                            {"source": "sensor_fusion", "target": "error_correction"},
+                            {"source": "error_correction", "target": "coord_output"}
                         ]
                     }
                 }
@@ -1306,102 +2081,144 @@ SCENARIOS: List[Scenario] = [
         },
     ),
     Scenario(
-        id="equipment_delivery_confirmation",  # 8. 效效确认 / 投放确认
+        id="equipment_delivery_confirmation",  # 8. 投放确认
         model_name="设备投放",
         name="投放确认",
         example_input="将侦察节点Y投放至X点并确认部署成功",
         reasoning_chain="结果感知（投放后图像、姿态信息、设备回传信号）→ 落点偏差分析（比较实际坐标与目标坐标）→ 功能状态检查（是否正常通电、是否建立通信链路）→ 投放成功判定（成功/失败/需重投）",
         prompt=(
             "【设备投放-投放确认专项要求】\n"
-            "1. 行为树必须包含：result_perception（投放后图像、姿态信息、设备回传信号）→ "
-            "deviation_analysis（比较实际坐标与目标坐标）→ "
-            "function_check（检查通电、通信链路状态）→ "
-            "deployment_judgment（判定成功/失败/需重投，包含 knowledge_graph）。\n"
-            "2. deployment_judgment 的 knowledge_graph 应体现：结果感知 → 偏差分析 → 功能检查 → 成功判定。"
+            "1. 行为树必须包含：task_ingest（任务接收）→ deployment_confirmation_sequence（投放确认序列）：\n"
+            "   - result_perception（投放后图像、姿态信息、设备回传信号）\n"
+            "   - deviation_analysis（比较实际坐标与目标坐标）\n"
+            "   - function_check（检查通电、通信链路状态）\n"
+            "   - deployment_judgment（判定成功/失败/需重投，包含 knowledge_graph）\n"
+            "2. deployment_judgment 的 knowledge_graph 应体现完整推理链：结果感知 → 落点偏差分析 → 功能状态检查 → 投放成功判定。"
         ),
         example_output={
             "default_focus": "deployment_judgment",
             "behavior_tree": {
-                "id": "result_perception",
-                "label": "📷 结果感知",
+                "id": "task_ingest",
+                "label": "📋 任务接收",
                 "status": "completed",
-                "summary": "在设备Y投放至X点后，采集图像、姿态与设备回传信号，形成投放结果的第一手信息。",
+                "summary": "接收侦察节点Y投放至X点并确认部署成功的任务，解析确认要求与成功标准。",
                 "children": [
                     {
-                        "id": "deviation_analysis",
-                        "label": "落点偏差分析",
-                        "status": "completed",
-                        "summary": "将设备Y的实际落点坐标与预定坐标进行对比，评估空间偏差。",
-                        "children": []
-                    },
-                    {
-                        "id": "function_check",
-                        "label": "功能状态检查",
-                        "status": "completed",
-                        "summary": "检查设备Y是否正常通电、建立通信链路并处于预期工作模式。",
-                        "children": []
-                    },
-                    {
-                        "id": "deployment_judgment",
-                        "label": "✅ 投放成功判定",
+                        "id": "deployment_confirmation_sequence",
+                        "label": "✅ 投放确认序列",
                         "status": "active",
-                        "summary": "综合落点偏差与功能状态，给出“成功/失败/需重投”的判定结论。",
-                        "children": []
+                        "summary": "通过多维度感知、偏差分析与功能检测，完成投放结果的自动确认。",
+                        "children": [
+                            {
+                                "id": "result_perception",
+                                "label": "📷 结果感知",
+                                "status": "completed",
+                                "summary": "采集投放后图像、姿态信息与设备回传信号，建立投放结果的感知基础。",
+                                "children": []
+                            },
+                            {
+                                "id": "deviation_analysis",
+                                "label": "📐 落点偏差分析",
+                                "status": "completed",
+                                "summary": "将实际落点坐标与目标X点坐标对比，评估空间偏差是否在容差范围内。",
+                                "children": []
+                            },
+                            {
+                                "id": "function_check",
+                                "label": "🔌 功能状态检查",
+                                "status": "completed",
+                                "summary": "检查侦察节点Y是否正常通电、建立通信链路并处于预期工作模式。",
+                                "children": []
+                            },
+                            {
+                                "id": "deployment_judgment",
+                                "label": "✅ 投放成功判定",
+                                "status": "active",
+                                "summary": "综合落点偏差与功能状态，判定投放结果为成功/失败/需重投，并给出决策理由。",
+                                "children": []
+                            }
+                        ]
                     }
                 ]
             },
             "node_insights": {
+                "task_ingest": {
+                    "title": "任务接收",
+                    "summary": "接收并解析投放确认任务，明确侦察节点Y、目标点X及部署成功的判定标准。",
+                    "key_points": [
+                        "解析任务描述：待投放设备为侦察节点Y，目标点为X",
+                        "提取确认要求：落点偏差容差、通电状态、通信链路建立",
+                        "明确判定标准：成功（偏差在容差内+功能正常）、失败（严重偏差或功能受损）、需重投（可修复或轻微偏差）"
+                    ],
+                    "knowledge_trace": "任务文本 → 关键要素提取 → 确认标准明确 → 后续感知与判定准备。"
+                },
+                "deployment_confirmation_sequence": {
+                    "title": "投放确认序列",
+                    "summary": "通过结果感知、偏差分析、功能检查的顺序流程，实现投放结果的自动化确认。",
+                    "key_points": [
+                        "分步骤执行：感知采集 → 偏差评估 → 功能检测 → 综合判定",
+                        "各步骤相互支撑，共同形成投放结果的多维度评估",
+                        "确保判定依据充分、结论可靠、可追溯"
+                    ],
+                    "knowledge_trace": "顺序执行确认流程 → 汇总多维度证据 → 输出可靠判定结论。"
+                },
                 "result_perception": {
                     "title": "结果感知",
                     "summary": "通过机载和地面传感器获取设备投放后的图像、姿态与通信状态，建立投放结果的感知基础。",
                     "key_points": [
-                        "采集覆盖设备周边的全景或多角度图像，观察落点环境",
-                        "利用惯导或姿态传感器估计设备的姿态（是否倾倒、是否稳定）",
-                        "读取设备回传的基础心跳与状态码，确认是否上线"
+                        "图像采集：使用无人机或地面摄像头获取设备落点的全景或多角度图像",
+                        "姿态感知：通过惯导或姿态传感器估计设备姿态（俯仰、横滚、偏航角），判断是否倾倒或倾斜",
+                        "信号回传：监听设备的心跳信号、状态码与初始化信息，确认设备是否上线",
+                        "环境感知：识别落点周边障碍物、地形坡度等环境因素"
                     ],
-                    "knowledge_trace": "图像与姿态采集 → 通信状态读取 → 形成可用于分析的投放结果数据集。"
+                    "knowledge_trace": "传感器触发 → 图像/姿态/信号数据采集 → 数据预处理与对齐 → 形成可用于分析的投放结果数据集。"
                 },
                 "deviation_analysis": {
                     "title": "落点偏差分析",
-                    "summary": "将设备实际落点坐标与任务规划的目标坐标进行对比，评估偏差是否在可接受范围内。",
+                    "summary": "将设备实际落点坐标与任务规划的目标X点坐标进行对比，评估偏差是否在可接受范围内。",
                     "key_points": [
-                        "根据图像/传感器数据估计设备在地图坐标中的实际位置",
-                        "计算与目标坐标之间的水平偏差与高度差",
-                        "将偏差与任务容差阈值进行比较，给出“在容差内/超出容差”的结论"
+                        "位置反算：基于图像识别、GPS或视觉定位技术估算设备在地图坐标系中的实际位置",
+                        "偏差计算：计算实际落点与目标X点之间的水平偏差（欧氏距离或沿东北向分量）和高度差",
+                        "容差比对：将偏差值与任务容差阈值（如水平±5m，高度±2m）进行比较",
+                        "偏差分级：给出\"在容差内/接近容差/超出容差\"的分级结论，供后续判定使用"
                     ],
-                    "knowledge_trace": "实际位置反算 → 与目标坐标对比 → 偏差归类与标记。"
+                    "knowledge_trace": "感知数据 → 实际位置反算 → 与目标坐标对比 → 偏差量化与分级标记。"
                 },
                 "function_check": {
                     "title": "功能状态检查",
-                    "summary": "检查设备是否正常通电、建立通信链路并在预期模式下运行。",
+                    "summary": "检查侦察节点Y是否正常通电、建立通信链路并在预期模式下运行。",
                     "key_points": [
-                        "确认设备电源状态与电量水平在安全范围内",
-                        "验证与指挥端或中继节点的通信链路是否建立稳定",
-                        "检查关键功能模块（传感器/计算/通信）是否按预期上电自检通过"
+                        "电源检查：确认设备电源状态（开机/关机）、电量水平（百分比）、供电稳定性",
+                        "通信链路：验证与指挥端、中继节点或卫星的通信链路是否建立，测试信号强度与延迟",
+                        "功能模块自检：检查关键模块（传感器、计算单元、通信模块）是否通过上电自检（POST）",
+                        "工作模式确认：确认设备是否进入预期的工作模式（如侦察、待机、数据采集）",
+                        "异常告警：记录并上报任何功能异常、告警或故障代码"
                     ],
-                    "knowledge_trace": "设备状态采集 → 通信链路与功能模块检查 → 形成“可用/受限/不可用”的功能结论。"
+                    "knowledge_trace": "设备状态采集 → 电源/通信/功能模块逐项检查 → 形成\"可用/受限/不可用\"的功能结论。"
                 },
                 "deployment_judgment": {
                     "title": "投放成功判定",
                     "summary": "综合落点偏差结果与功能状态，判断本次投放是否成功，如失败则给出是否需要重投的建议。",
                     "key_points": [
-                        "若落点在容差范围内且功能完好，则标记为“投放成功”",
-                        "若落点偏差较大或设备功能严重受损，则标记为“投放失败/需重投”",
-                        "在边界情况（轻微偏差或部分功能受限）下，给出“勉强可用/建议补救策略”的说明"
+                        "成功判定：落点偏差在容差范围内 且 设备功能完好 且 通信链路稳定 → 标记为\"投放成功\"",
+                        "失败判定：落点偏差严重超出容差 或 设备功能严重受损/无法通信 → 标记为\"投放失败\"",
+                        "重投建议：轻微偏差（接近容差边界）或 部分功能受限但可补救 → 标记为\"需重投/建议人工介入\"",
+                        "决策依据：记录偏差值、功能检查结果、判定规则与最终结论，形成可追溯的判定报告",
+                        "后续动作：成功则进入下一任务，失败则触发重投流程或告警通知"
                     ],
-                    "knowledge_trace": "偏差分析结果 + 功能检查结果 → 规则或经验模型推理 → 输出成功/失败/需重投的判定及理由。",
+                    "knowledge_trace": "落点偏差分析结果 + 功能状态检查结果 → 规则引擎或决策模型推理 → 输出成功/失败/需重投的判定及详细理由。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "perception", "label": "结果感知", "type": "input"},
-                            {"id": "deviation", "label": "落点偏差分析", "type": "process"},
-                            {"id": "function", "label": "功能状态检查", "type": "process"},
-                            {"id": "judgment", "label": "投放成功判定", "type": "output"}
+                            {"id": "result_perception", "label": "结果感知", "type": "input"},
+                            {"id": "deviation_analysis", "label": "落点偏差分析", "type": "process"},
+                            {"id": "function_check", "label": "功能状态检查", "type": "process"},
+                            {"id": "deployment_judgment", "label": "投放成功判定", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "perception", "target": "deviation"},
-                            {"source": "perception", "target": "function"},
-                            {"source": "deviation", "target": "judgment"},
-                            {"source": "function", "target": "judgment"}
+                            {"source": "result_perception", "target": "deviation_analysis"},
+                            {"source": "result_perception", "target": "function_check"},
+                            {"source": "deviation_analysis", "target": "deployment_judgment"},
+                            {"source": "function_check", "target": "deployment_judgment"}
                         ]
                     }
                 }
@@ -2974,16 +3791,16 @@ SCENARIOS: List[Scenario] = [
         },
     ),
 
-    # 六、后勤物资管控支援模型测试
+    # 六、后勤资源管控支援模型测试
     # 21. 资源入库
     Scenario(
         id="resource_inbound_processing",  # 21. 资源入库
-        model_name="后勤物资管控",
+        model_name="后勤资源管控",
         name="资源入库",
         example_input="新到达一批医疗物资X，需要入库保管。",
         reasoning_chain="物资属性解析（类型、数量、体积、保存条件）→ 仓储类型匹配（冷藏区/常温区/危险品区）→ 仓位推荐（按剩余容量、出入库频次、同类物资位置匹配）→ 入库登记（生成标签、记录批次与有效期）",
         prompt=(
-            "【后勤物资管控-资源入库专项要求（详细输出版）】\n"
+            "【后勤资源管控-资源入库专项要求（详细输出版）】\n"
             "\n"
             "=== 一、行为树结构要求 ===\n"
             "1. 行为树必须至少包含以下核心节点，且严格按照推理链条自上而下展开：\n"
@@ -3080,74 +3897,74 @@ SCENARIOS: List[Scenario] = [
                 "children": [
                     {
                         "id": "material_attribute_parsing",
-                        "label": "✅ 物资属性解析：医疗物资X，50箱，2.5m³",
+                        "label": "📋 物资属性解析",
                         "status": "completed",
-                        "summary": "解析医疗物资X的属性：类型为急救药品，数量50箱，总体积2.5m³，需在常温（15-25℃）条件下保存，有效期至2025年12月，需避光。",
+                        "summary": "解析医疗物资X的属性：识别物资类型、统计数量与体积、分析保存条件（温度、湿度、特殊要求）与有效期。",
                         "children": [
                             {
                                 "id": "type_identification",
-                                "label": "类型识别：急救药品",
+                                "label": "🏷️ 类型识别",
                                 "status": "completed",
-                                "summary": "基于物资标签与单据信息，识别为医疗物资中的急救药品类别，不属于危险品。",
+                                "summary": "基于物资标签与单据信息，识别物资类别（如急救药品、医疗器械等），判断是否属于危险品或需特殊存储。",
                                 "children": []
                             },
                             {
                                 "id": "quantity_volume_analysis",
-                                "label": "数量体积分析：50箱，2.5m³",
+                                "label": "📊 数量体积分析",
                                 "status": "completed",
-                                "summary": "统计物资数量为50箱，单箱体积0.05m³，总体积2.5m³，单箱重量约10kg，总重量约500kg。",
+                                "summary": "统计物资数量（箱数或件数）、测量单位体积、计算总体积与重量，为仓位容量匹配提供依据。",
                                 "children": []
                             },
                             {
                                 "id": "storage_condition_analysis",
-                                "label": "保存条件分析：常温15-25℃，避光",
+                                "label": "🌡️ 保存条件分析",
                                 "status": "completed",
-                                "summary": "分析保存条件：需在15-25℃常温环境下保存，需避光，湿度要求60-70%，有效期至2025年12月。",
+                                "summary": "分析保存条件要求：温度范围（常温/冷藏/冷冻）、湿度要求、特殊要求（避光、通风等）与有效期信息。",
                                 "children": []
                             }
                         ]
                     },
                     {
                         "id": "warehouse_type_matching",
-                        "label": "✅ 仓储类型匹配：常温区",
+                        "label": "🏭 仓储类型匹配",
                         "status": "completed",
-                        "summary": "根据保存条件15-25℃匹配常温仓储区，该区域当前可用容量充足，温度控制稳定在20±2℃。",
+                        "summary": "根据保存条件匹配仓储区域类型（常温区/冷藏区/危险品区/特殊存储区），验证区域可用容量与环境参数。",
                         "children": []
                     },
                     {
                         "id": "position_recommendation",
-                        "label": "✅ 仓位推荐：A区-3号货架-2层",
+                        "label": "✅ 仓位推荐",
                         "status": "active",
-                        "summary": "推荐A区-3号货架-2层作为入库仓位，该位置剩余容量3.0m³（满足2.5m³需求），月出入库频次15次（中等活跃度），同类医疗物资位于相邻A区-2号货架，便于统一管理。",
+                        "summary": "综合剩余容量、出入库频次、同类物资位置等因素，推荐最优仓位，便于统一管理与快速取用。",
                         "children": [
                             {
                                 "id": "capacity_analysis",
-                                "label": "剩余容量分析：3.0m³可用",
+                                "label": "📦 剩余容量分析",
                                 "status": "completed",
-                                "summary": "分析A区-3号货架-2层：总容量5.0m³，已占用2.0m³，剩余容量3.0m³，满足2.5m³入库需求，且有0.5m³余量。",
+                                "summary": "查询候选仓位的总容量、已占用容量，计算剩余容量，验证是否满足入库需求并预留余量。",
                                 "children": []
                             },
                             {
                                 "id": "frequency_analysis",
-                                "label": "出入库频次分析：月15次",
+                                "label": "📈 出入库频次分析",
                                 "status": "completed",
-                                "summary": "统计该区域月出入库频次为15次，属于中等活跃度，适合存放常用医疗物资，便于快速取用。",
+                                "summary": "统计候选区域的历史出入库频次，评估活跃度（低/中/高），选择适合物资使用特性的仓位。",
                                 "children": []
                             },
                             {
                                 "id": "similar_material_location",
-                                "label": "同类物资位置匹配：A区-2号货架",
+                                "label": "🔍 同类物资位置匹配",
                                 "status": "completed",
-                                "summary": "查询同类医疗物资（急救药品）位于A区-2号货架，推荐相邻的A区-3号货架，便于统一管理与快速定位。",
+                                "summary": "查询同类物资的存储位置，推荐相邻仓位以实现统一管理、快速定位与减少查找时间。",
                                 "children": []
                             }
                         ]
                     },
                     {
                         "id": "inventory_recording",
-                        "label": "✅ 入库登记：标签MED-X-20241215-001",
+                        "label": "📝 入库登记",
                         "status": "completed",
-                        "summary": "生成入库标签MED-X-20241215-001，记录批次号BATCH-20241215-50，有效期至2025年12月，登记时间2024年12月15日14:30，操作人员系统自动登记。",
+                        "summary": "生成入库标签、记录批次号、有效期、登记时间与操作信息，同步至库存管理系统。",
                         "children": []
                     }
                 ]
@@ -3229,12 +4046,12 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "物资属性与仓储区域 → 剩余容量计算 → 频次与同类物资位置分析 → 形成仓位推荐方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "material_parsing", "label": "物资属性解析(医疗物资X, 50箱, 2.5m³, 常温保存)", "type": "input"},
-                            {"id": "warehouse_matching", "label": "仓储类型匹配(常温区)", "type": "process"},
-                            {"id": "capacity_analysis", "label": "容量分析(A区-3号货架-2层, 剩余3.0m³)", "type": "process"},
-                            {"id": "frequency_analysis", "label": "频次分析(月15次, 中等活跃度)", "type": "process"},
-                            {"id": "location_matching", "label": "位置匹配(同类物资A区-2号货架)", "type": "process"},
-                            {"id": "position_recommendation", "label": "仓位推荐(A区-3号货架-2层)", "type": "output"}
+                            {"id": "material_parsing", "label": "物资属性解析", "type": "input"},
+                            {"id": "warehouse_matching", "label": "仓储类型匹配", "type": "process"},
+                            {"id": "capacity_analysis", "label": "容量分析", "type": "process"},
+                            {"id": "frequency_analysis", "label": "频次分析", "type": "process"},
+                            {"id": "location_matching", "label": "位置匹配", "type": "process"},
+                            {"id": "position_recommendation", "label": "仓位推荐", "type": "output"}
                         ],
                         "edges": [
                             {"source": "material_parsing", "target": "warehouse_matching"},
@@ -3295,12 +4112,12 @@ SCENARIOS: List[Scenario] = [
     # 22. 资源盘点
     Scenario(
         id="resource_inventory_check",  # 22. 资源盘点
-        model_name="后勤物资管控",
+        model_name="后勤资源管控",
         name="资源盘点",
         example_input="对食品与医疗物资进行周期性盘点，确保数据一致。",
         reasoning_chain="库存数据解析（账面数量、实际传感数量）→ 盘点策略制定（优先检查消耗快的品类）→ 差异检测（短缺、过期、误放）→ 异常定位（原因分析，如运输损耗、登记错误、未记录的应急领取）",
         prompt=(
-            "【后勤物资管控-资源盘点专项要求（详细输出版）】\n"
+            "【后勤资源管控-资源盘点专项要求】\n"
             "\n"
             "=== 一、行为树结构要求 ===\n"
             "1. 行为树必须至少包含以下核心节点，且严格按照推理链条自上而下展开：\n"
@@ -3397,74 +4214,74 @@ SCENARIOS: List[Scenario] = [
                 "children": [
                     {
                         "id": "inventory_data_parsing",
-                        "label": "✅ 库存数据解析：账面120箱，实际115箱",
+                        "label": "📋 库存数据解析",
                         "status": "completed",
-                        "summary": "对比账面数量120箱与实际传感数量115箱，发现短缺5箱，差异率4.2%，同时检测到3箱物资已过期，2箱物资位置与登记不符。",
+                        "summary": "对比账面数量与实际传感数量，识别短缺、过期与误放等差异情况，计算差异率并评估合理性。",
                         "children": [
                             {
                                 "id": "book_quantity_analysis",
-                                "label": "账面数量分析：120箱",
+                                "label": "📖 账面数量分析",
                                 "status": "completed",
-                                "summary": "从库存系统查询食品与医疗物资的账面数量：食品类80箱，医疗物资类40箱，合计120箱。",
+                                "summary": "从库存管理系统查询食品与医疗物资的账面数量，按类别汇总统计。",
                                 "children": []
                             },
                             {
                                 "id": "sensor_quantity_analysis",
-                                "label": "实际传感数量分析：115箱",
+                                "label": "📡 实际传感数量分析",
                                 "status": "completed",
-                                "summary": "通过RFID传感器读取实际库存数量：食品类77箱，医疗物资类38箱，合计115箱。",
+                                "summary": "通过RFID传感器或人工清点获取实际库存数量，按类别汇总统计并验证数据准确性。",
                                 "children": []
                             },
                             {
                                 "id": "data_comparison",
-                                "label": "数据对比：差异5箱，差异率4.2%",
+                                "label": "🔍 数据对比",
                                 "status": "completed",
-                                "summary": "计算差异：账面120箱 - 实际115箱 = 短缺5箱，差异率 = 5 ÷ 120 × 100% = 4.2%，超出合理范围（±2%）。",
+                                "summary": "计算账面与实际数量的差异，计算差异率，评估是否在合理范围内。",
                                 "children": []
                             }
                         ]
                     },
                     {
                         "id": "inventory_strategy_formulation",
-                        "label": "✅ 盘点策略制定：优先食品类",
+                        "label": "📝 盘点策略制定",
                         "status": "completed",
-                        "summary": "制定盘点策略：食品类消耗快、易过期，优先进行全面盘点；医疗物资类进行重点抽查，重点关注有效期和位置准确性。",
+                        "summary": "根据物资特性、消耗速度与重要性制定盘点策略，确定优先级、盘点方法与重点关注项。",
                         "children": []
                     },
                     {
                         "id": "difference_detection",
-                        "label": "✅ 差异检测：短缺5箱，过期3箱，误放2箱",
+                        "label": "✅ 差异检测",
                         "status": "active",
-                        "summary": "检测到三类差异：短缺5箱（账面120箱 - 实际115箱），过期3箱（有效期已过），误放2箱（位置与登记不符），总计差异10箱。",
+                        "summary": "检测三类差异：短缺（账面与实际数量差）、过期（有效期已过）、误放（位置与登记不符），汇总差异情况。",
                         "children": [
                             {
                                 "id": "shortage_detection",
-                                "label": "短缺检测：5箱",
+                                "label": "📉 短缺检测",
                                 "status": "completed",
-                                "summary": "检测到短缺5箱：食品类短缺3箱（账面80箱 - 实际77箱），医疗物资类短缺2箱（账面40箱 - 实际38箱）。",
+                                "summary": "识别账面数量大于实际数量的情况，分析短缺分布、计算短缺率并评估影响。",
                                 "children": []
                             },
                             {
                                 "id": "expiry_detection",
-                                "label": "过期检测：3箱",
+                                "label": "⏰ 过期检测",
                                 "status": "completed",
-                                "summary": "检测到3箱物资已过期：食品类2箱（有效期至2024年11月，已过期1个月），医疗物资类1箱（有效期至2024年10月，已过期2个月）。",
+                                "summary": "检查物资有效期信息，识别已过期物资并分析过期原因，生成隔离与处理建议。",
                                 "children": []
                             },
                             {
                                 "id": "misplacement_detection",
-                                "label": "误放检测：2箱",
+                                "label": "📍 误放检测",
                                 "status": "completed",
-                                "summary": "检测到2箱物资位置与登记不符：食品类1箱（登记在A区-1号货架，实际在A区-3号货架），医疗物资类1箱（登记在B区-2号货架，实际在B区-5号货架）。",
+                                "summary": "对比登记位置与实际扫描位置，识别位置不符的物资并分析误放原因。",
                                 "children": []
                             }
                         ]
                     },
                     {
                         "id": "anomaly_localization",
-                        "label": "✅ 异常定位：运输损耗2箱，登记错误3箱，应急领取1箱",
+                        "label": "🔎 异常定位",
                         "status": "completed",
-                        "summary": "分析差异原因：短缺5箱可能因运输损耗2箱、登记错误2箱、未记录应急领取1箱；过期3箱因未及时使用且未设置预警；误放2箱因入库时登记错误。",
+                        "summary": "分析差异原因：运输损耗、登记错误、未记录应急领取、未设置预警等，生成异常定位报告与处理建议。",
                         "children": []
                     }
                 ]
@@ -3472,87 +4289,85 @@ SCENARIOS: List[Scenario] = [
             "node_insights": {
                 "task_analysis": {
                     "title": "任务分析与解析",
-                    "summary": "对\"对食品与医疗物资进行周期性盘点，确保数据一致\"的任务进行结构化解析，明确盘点范围、盘点类型、时间要求等基础信息。",
+                    "summary": "对盘点任务进行结构化解析，明确盘点范围（食品与医疗物资）、盘点类型（周期性）、目标（确保数据一致）等基础信息。",
                     "key_points": [
-                        "抽取任务要素：食品与医疗物资、周期性盘点、确保数据一致",
-                        "识别盘点类型：周期性盘点，非紧急全面盘点",
+                        "抽取任务要素：盘点对象、盘点周期、数据一致性要求",
+                        "识别盘点类型：周期性盘点、全面盘点或重点抽查",
                         "为后续库存数据解析与差异检测提供统一的数据输入框架"
                     ],
-                    "knowledge_trace": "任务文本解析 → 盘点范围/类型/时间要素抽取 → 形成可供后续节点复用的标准任务描述。"
+                    "knowledge_trace": "任务文本解析 → 盘点范围/类型/目标要素抽取 → 形成可供后续节点复用的标准任务描述。"
                 },
                 "inventory_data_parsing": {
                     "title": "库存数据解析",
-                    "summary": "对比账面数量120箱与实际传感数量115箱，发现短缺5箱，差异率4.2%，同时检测到3箱物资已过期，2箱物资位置与登记不符。",
+                    "summary": "对比库存系统的账面数量与传感器采集的实际数量，计算差异值与差异率，为差异检测提供数据基础。",
                     "key_points": [
-                        "从库存系统查询账面数量：食品类80箱，医疗物资类40箱，合计120箱",
-                        "通过RFID传感器读取实际数量：食品类77箱，医疗物资类38箱，合计115箱",
-                        "计算差异：账面120箱 - 实际115箱 = 短缺5箱，差异率 = 5 ÷ 120 × 100% = 4.2%",
-                        "验证差异合理性：差异率4.2%超出合理范围（±2%），需要进一步分析原因"
+                        "查询账面数据：从库存管理系统获取各类物资的账面登记数量",
+                        "采集实际数据：通过RFID传感器、条码扫描或人工清点获取实际库存数量",
+                        "计算差异指标：差异数量（账面-实际）、差异率（差异÷账面×100%）",
+                        "评估差异合理性：判断差异是否在可接受范围内（如±2%），超出则需深入分析"
                     ],
-                    "knowledge_trace": "库存系统数据查询 → 账面数量提取 → 传感器数据读取 → 实际数量统计 → 数据对比分析。"
+                    "knowledge_trace": "库存系统数据查询 → 账面数量提取 → 传感器数据采集 → 实际数量统计 → 数据对比分析。"
                 },
                 "book_quantity_analysis": {
                     "title": "账面数量分析",
-                    "summary": "从库存系统查询食品与医疗物资的账面数量：食品类80箱，医疗物资类40箱，合计120箱。",
+                    "summary": "从库存管理系统查询各类物资的账面数量，按类别汇总统计并记录数据来源与更新时间。",
                     "key_points": [
-                        "查询食品类账面数量：从库存系统查询食品类物资账面数量为80箱",
-                        "查询医疗物资类账面数量：从库存系统查询医疗物资类账面数量为40箱",
-                        "汇总账面数量：食品类80箱 + 医疗物资类40箱 = 合计120箱",
-                        "记录账面数据来源：数据来源于库存管理系统，最后更新时间2024年12月10日"
+                        "查询账面数量：从库存系统按类别（食品类、医疗物资类等）查询账面登记数量",
+                        "数量汇总统计：按类别汇总，计算各类别小计与总计",
+                        "数据来源记录：记录数据来源系统、查询时间与最后更新时间"
                     ],
                     "knowledge_trace": "库存系统查询 → 分类别数量提取 → 数量汇总 → 数据来源记录。"
                 },
                 "sensor_quantity_analysis": {
                     "title": "实际传感数量分析",
-                    "summary": "通过RFID传感器读取实际库存数量：食品类77箱，医疗物资类38箱，合计115箱。",
+                    "summary": "通过RFID传感器、条码扫描或人工清点获取实际库存数量，按类别汇总统计并验证数据准确性。",
                     "key_points": [
-                        "读取食品类实际数量：通过RFID传感器扫描，食品类实际数量为77箱",
-                        "读取医疗物资类实际数量：通过RFID传感器扫描，医疗物资类实际数量为38箱",
-                        "汇总实际数量：食品类77箱 + 医疗物资类38箱 = 合计115箱",
-                        "验证传感器数据准确性：RFID传感器数据与人工清点结果一致，数据可靠"
+                        "数据采集方式：RFID传感器扫描、条码扫描或人工清点",
+                        "分类别统计：按物资类别读取实际数量并汇总",
+                        "数据准确性验证：与人工抽查结果对比，确认传感器数据可靠性"
                     ],
-                    "knowledge_trace": "RFID传感器扫描 → 分类别数量读取 → 数量汇总 → 数据准确性验证。"
+                    "knowledge_trace": "传感器数据采集 → 分类别数量读取 → 数量汇总 → 数据准确性验证。"
                 },
                 "data_comparison": {
                     "title": "数据对比",
-                    "summary": "计算差异：账面120箱 - 实际115箱 = 短缺5箱，差异率 = 5 ÷ 120 × 100% = 4.2%，超出合理范围（±2%）。",
+                    "summary": "计算账面与实际数量的差异值与差异率，分析差异分布，评估差异是否在合理范围内。",
                     "key_points": [
-                        "计算总差异：账面120箱 - 实际115箱 = 短缺5箱",
-                        "计算差异率：差异率 = 短缺数量 ÷ 账面数量 × 100% = 5 ÷ 120 × 100% = 4.2%",
-                        "分类别差异：食品类差异3箱（80-77），医疗物资类差异2箱（40-38）",
-                        "评估差异合理性：差异率4.2%超出合理范围（±2%），需要进一步分析原因"
+                        "差异计算：账面数量 - 实际数量 = 短缺（正值）或盈余（负值）",
+                        "差异率计算：差异率 = 差异数量 ÷ 账面数量 × 100%",
+                        "分类别差异分析：各类别的短缺或盈余情况",
+                        "合理性评估：对比差异容差标准（如±2%），判断是否需要深入分析"
                     ],
                     "knowledge_trace": "账面与实际数量对比 → 差异计算 → 差异率计算 → 合理性评估。"
                 },
                 "inventory_strategy_formulation": {
                     "title": "盘点策略制定",
-                    "summary": "制定盘点策略：食品类消耗快、易过期，优先进行全面盘点；医疗物资类进行重点抽查，重点关注有效期和位置准确性。",
+                    "summary": "根据物资特性（消耗速度、易过期性、重要性等）制定盘点策略，确定优先级、盘点方法与重点关注项。",
                     "key_points": [
-                        "分析物资特性：食品类消耗快、易过期，需要优先盘点；医疗物资类相对稳定，可重点抽查",
-                        "确定盘点优先级：食品类 > 医疗物资类，消耗快的品类优先",
-                        "制定盘点方法：食品类进行全面盘点（100%），医疗物资类进行重点抽查（50%重点区域）",
-                        "设定盘点重点：食品类重点关注数量和有效期，医疗物资类重点关注位置准确性和有效期"
+                        "物资特性分析：消耗速度（快/中/慢）、易过期性、重要程度",
+                        "盘点优先级排序：消耗快、易过期的品类优先全面盘点",
+                        "盘点方法选择：全面盘点、重点抽查或周期性轮盘",
+                        "重点关注项设定：数量准确性、有效期、位置准确性等"
                     ],
-                    "knowledge_trace": "物资特性分析 → 消耗速度评估 → 盘点优先级排序 → 盘点方法制定。"
+                    "knowledge_trace": "物资特性分析 → 消耗速度评估 → 盘点优先级排序 → 盘点方法与重点制定。"
                 },
                 "difference_detection": {
                     "title": "差异检测",
-                    "summary": "检测到三类差异：短缺5箱（账面120箱 - 实际115箱），过期3箱（有效期已过），误放2箱（位置与登记不符），总计差异10箱。",
+                    "summary": "检测三类差异：短缺（账面大于实际）、过期（有效期已过）、误放（位置与登记不符），汇总差异情况。",
                     "key_points": [
-                        "短缺数量计算：账面120箱 - 实际115箱 = 短缺5箱，其中食品类短缺3箱，医疗物资类短缺2箱",
-                        "过期物资检测：检测到3箱物资已过期，食品类2箱（有效期至2024年11月，已过期1个月），医疗物资类1箱（有效期至2024年10月，已过期2个月）",
-                        "误放物资识别：发现2箱物资位置与登记不符，食品类1箱（登记在A区-1号货架，实际在A区-3号货架），医疗物资类1箱（登记在B区-2号货架，实际在B区-5号货架）",
-                        "差异汇总：总计差异10箱（短缺5箱 + 过期3箱 + 误放2箱），需要进一步分析原因"
+                        "短缺检测：识别账面数量大于实际数量的物资，分析短缺分布与短缺率",
+                        "过期检测：查询有效期信息，识别已过期或临近过期的物资",
+                        "误放检测：对比登记位置与实际扫描位置，识别位置不符的物资",
+                        "差异汇总：汇总各类差异的数量、比例与影响，为异常定位提供依据"
                     ],
                     "knowledge_trace": "库存数据对比 → 短缺检测 → 过期检测 → 误放检测 → 差异汇总。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "inventory_parsing", "label": "库存数据解析(账面120箱, 实际115箱)", "type": "input"},
-                            {"id": "strategy_formulation", "label": "盘点策略制定(优先食品类)", "type": "process"},
-                            {"id": "shortage_detection", "label": "短缺检测(5箱)", "type": "process"},
-                            {"id": "expiry_detection", "label": "过期检测(3箱)", "type": "process"},
-                            {"id": "misplacement_detection", "label": "误放检测(2箱)", "type": "process"},
-                            {"id": "difference_summary", "label": "差异汇总(总计10箱)", "type": "output"}
+                            {"id": "inventory_parsing", "label": "库存数据解析", "type": "input"},
+                            {"id": "strategy_formulation", "label": "盘点策略制定", "type": "process"},
+                            {"id": "shortage_detection", "label": "短缺检测", "type": "process"},
+                            {"id": "expiry_detection", "label": "过期检测", "type": "process"},
+                            {"id": "misplacement_detection", "label": "误放检测", "type": "process"},
+                            {"id": "difference_summary", "label": "差异汇总", "type": "output"}
                         ],
                         "edges": [
                             {"source": "inventory_parsing", "target": "strategy_formulation"},
@@ -3567,47 +4382,47 @@ SCENARIOS: List[Scenario] = [
                 },
                 "shortage_detection": {
                     "title": "短缺检测",
-                    "summary": "检测到短缺5箱：食品类短缺3箱（账面80箱 - 实际77箱），医疗物资类短缺2箱（账面40箱 - 实际38箱）。",
+                    "summary": "识别账面数量大于实际数量的物资，分析短缺分布、计算短缺率并评估对日常供应的影响。",
                     "key_points": [
-                        "食品类短缺计算：账面80箱 - 实际77箱 = 短缺3箱，短缺率 = 3 ÷ 80 × 100% = 3.75%",
-                        "医疗物资类短缺计算：账面40箱 - 实际38箱 = 短缺2箱，短缺率 = 2 ÷ 40 × 100% = 5.0%",
-                        "短缺分布分析：食品类短缺主要集中在易消耗的快速消费品，医疗物资类短缺分布在常用急救药品",
-                        "短缺影响评估：短缺5箱可能影响日常供应，需要及时补充并分析原因"
+                        "短缺计算：账面数量 - 实际数量 = 短缺数量（正值）",
+                        "短缺率计算：短缺率 = 短缺数量 ÷ 账面数量 × 100%",
+                        "短缺分布分析：按类别、货架区域分析短缺集中度",
+                        "影响评估：评估短缺对日常供应的影响，提出补充建议"
                     ],
                     "knowledge_trace": "分类别数量对比 → 短缺数量计算 → 短缺率计算 → 影响评估。"
                 },
                 "expiry_detection": {
                     "title": "过期检测",
-                    "summary": "检测到3箱物资已过期：食品类2箱（有效期至2024年11月，已过期1个月），医疗物资类1箱（有效期至2024年10月，已过期2个月）。",
+                    "summary": "检查物资有效期信息，识别已过期或临近过期的物资，分析过期原因并生成隔离与处理建议。",
                     "key_points": [
-                        "食品类过期检测：检测到2箱食品类物资有效期至2024年11月，已过期1个月，需要立即隔离处理",
-                        "医疗物资类过期检测：检测到1箱医疗物资有效期至2024年10月，已过期2个月，需要隔离并评估是否可回收利用",
-                        "过期原因分析：过期因未及时使用且未设置有效期预警，导致过期物资未及时发现",
-                        "处理建议：立即隔离过期物资，设置有效期预警机制，优先使用临近过期物资"
+                        "有效期查询：从物资标签或系统记录中提取有效期信息",
+                        "过期识别：对比当前日期与有效期，识别已过期物资",
+                        "过期原因分析：未及时使用、未设置预警、消耗速度低于预期等",
+                        "处理建议：立即隔离、设置预警机制、优先使用临近过期物资"
                     ],
                     "knowledge_trace": "有效期信息查询 → 过期物资识别 → 过期原因分析 → 处理建议生成。"
                 },
                 "misplacement_detection": {
                     "title": "误放检测",
-                    "summary": "检测到2箱物资位置与登记不符：食品类1箱（登记在A区-1号货架，实际在A区-3号货架），医疗物资类1箱（登记在B区-2号货架，实际在B区-5号货架）。",
+                    "summary": "对比登记位置与实际扫描位置，识别位置不符的物资，分析误放原因并生成位置更新建议。",
                     "key_points": [
-                        "食品类误放识别：发现1箱食品类物资登记在A区-1号货架，实际RFID扫描位置在A区-3号货架",
-                        "医疗物资类误放识别：发现1箱医疗物资登记在B区-2号货架，实际RFID扫描位置在B区-5号货架",
-                        "误放原因分析：误放可能因入库时登记错误、搬运过程中位置变更未及时更新、或人工操作失误",
-                        "处理建议：更新库存系统位置信息，加强入库登记准确性，建立位置变更及时更新机制"
+                        "位置对比：从系统查询登记位置，通过传感器获取实际位置",
+                        "误放识别：识别登记位置与实际位置不一致的物资",
+                        "原因分析：入库登记错误、搬运后未更新、人工操作失误等",
+                        "处理建议：更新系统位置信息、加强登记准确性、建立位置变更及时更新机制"
                     ],
                     "knowledge_trace": "登记位置查询 → 实际位置扫描 → 位置对比 → 误放原因分析。"
                 },
                 "anomaly_localization": {
                     "title": "异常定位",
-                    "summary": "分析差异原因：短缺5箱可能因运输损耗2箱、登记错误2箱、未记录应急领取1箱；过期3箱因未及时使用且未设置预警；误放2箱因入库时登记错误。",
+                    "summary": "分析差异原因（运输损耗、登记错误、未记录应急领取、未设置预警等），生成异常定位报告与改进建议。",
                     "key_points": [
-                        "短缺原因分析：短缺5箱可能因运输损耗2箱（运输过程中损坏或丢失）、登记错误2箱（入库时多登记或出库时少登记）、未记录应急领取1箱（紧急情况下领取但未及时登记）",
-                        "过期原因分析：过期3箱因未及时使用（消耗速度低于预期）且未设置有效期预警（系统未提前提醒），导致过期物资未及时发现和处理",
-                        "误放原因分析：误放2箱因入库时登记错误（登记位置与实际放置位置不一致）或搬运过程中位置变更未及时更新系统",
-                        "处理建议：加强运输管理减少损耗、完善登记流程减少错误、设置有效期预警机制、建立位置变更及时更新机制、加强应急领取登记管理"
+                        "短缺原因分析：运输损耗（运输中损坏或丢失）、登记错误（入库多登或出库少登）、未记录应急领取（紧急领用未及时登记）",
+                        "过期原因分析：未及时使用（消耗速度低于预期）、未设置预警（系统未提前提醒）",
+                        "误放原因分析：入库登记错误（登记与实际位置不一致）、搬运后位置变更未更新",
+                        "改进建议：加强运输管理、完善登记流程、设置有效期预警、建立位置变更及时更新机制、加强应急领取登记"
                     ],
-                    "knowledge_trace": "差异检测结果 → 原因分析（运输损耗/登记错误/应急领取/未设置预警） → 形成异常定位报告与处理建议。"
+                    "knowledge_trace": "差异检测结果 → 原因分析（运输/登记/预警/应急） → 形成异常定位报告与改进建议。"
                 }
             }
         },
@@ -3615,12 +4430,12 @@ SCENARIOS: List[Scenario] = [
     # 23. 资源出库
     Scenario(
         id="resource_outbound_processing",  # 23. 资源出库
-        model_name="后勤物资管控",
+        model_name="后勤资源管控",
         name="资源出库",
         example_input="为即将执行任务的医疗小组准备急救包和耗材。",
         reasoning_chain="任务需求解析（急救包、绷带、注射器等）→ 库存匹配（查询可用数量与批次）→ 出库策略（先进先出/保质期优先）→ 装载与交接（生成移交记录并推荐运输车辆）",
         prompt=(
-            "【后勤物资管控-资源出库专项要求】\n"
+            "【后勤资源管控-资源出库专项要求】\n"
             "\n"
             "=== 一、行为树结构要求 ===\n"
             "1. 行为树必须至少包含两层结构（根节点必须有子节点，且至少有一个子节点还有子节点）：\n"
@@ -3880,12 +4695,12 @@ SCENARIOS: List[Scenario] = [
     # 24. 资源维护
     Scenario(
         id="resource_maintenance",  # 24. 资源维护
-        model_name="后勤物资管控",
+        model_name="后勤资源管控",
         name="资源维护",
         example_input="对现有无人机电池与医用设备进行例行维护。",
         reasoning_chain="资源状态解析（使用时长、损耗程度、有效期）→ 维护需求判断（需检测/需校准/易损件更换）→ 维护调度策略（优先级排序、资源替换方案）→ 维护记录更新（生成日志并同步至库存系统）",
         prompt=(
-            "【后勤物资管控-资源维护专项要求】\n"
+            "【后勤资源管控-资源维护专项要求】\n"
             "\n"
             "=== 一、行为树结构要求 ===\n"
             "1. 行为树必须至少包含两层结构（根节点必须有子节点，且至少有一个子节点还有子节点）：\n"
