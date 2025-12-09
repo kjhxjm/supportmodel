@@ -1121,24 +1121,69 @@ SCENARIOS: List[Scenario] = [
                                 "children": [
                                     {
                                         "id": "path_planning_base",
-                                        "label": "📍 路径规划（基础）",
+                                        "label": "📍 路径规划",
                                         "status": "completed",
                                         "summary": "基于高精度地图与实时路况信息，规划从(102,0)到(190,100)的最优路径，预计行驶距离110km，预估耗时1.5小时（含安全余量）。",
-                                        "children": []
+                                        "children": [
+                                            {
+                                                "id": "map_data",
+                                                "label": "🗺️ 地图数据",
+                                                "status": "completed",
+                                                "summary": "加载1:10000高精度地图，包含道路等级、坡度信息、路面类型、历史损毁记录、桥梁涵洞位置等关键地理要素。",
+                                                "children": []
+                                            },
+                                            {
+                                                "id": "road_condition_data",
+                                                "label": "🛣️ 实时路况",
+                                                "status": "completed",
+                                                "summary": "实时获取卫星影像与历史通行数据，标注高风险区域（塌方、积水、施工），更新频率5分钟/次，路况置信度>85%。",
+                                                "children": []
+                                            }
+                                        ]
                                     },
                                     {
                                         "id": "anomaly_perception",
                                         "label": "👁️ 异常感知与处理",
                                         "status": "completed",
                                         "summary": "当感知数据出现异常（如前方道路塌方、积水、障碍物）时，派遣机器狗抵近观察，获取精确障碍信息与可通行性评估。",
-                                        "children": []
+                                        "children": [
+                                            {
+                                                "id": "anomaly_detection",
+                                                "label": "⚠️ 感知数据异常",
+                                                "status": "completed",
+                                                "summary": "车载传感器检测到异常：前方道路影像与地图不符、障碍物体积超出通行空间、路面反射异常（可能积水）、激光雷达回波异常等。",
+                                                "children": []
+                                            },
+                                            {
+                                                "id": "robot_dog_scout",
+                                                "label": "🐕 派遣机器狗抵近观察",
+                                                "status": "completed",
+                                                "summary": "从队尾释放机器狗，行进至异常点前方20m进行抵近观察，采集障碍物尺寸与材质、路面承载能力、积水深度、可通行宽度等数据，实时回传（延迟<500ms）。",
+                                                "children": []
+                                            }
+                                        ]
                                     },
                                     {
                                         "id": "dynamic_replanning",
                                         "label": "🔀 动态重规划",
                                         "status": "completed",
                                         "summary": "综合车队当前位置、剩余电量、货物状态、地图信息与异常感知结果，实时计算最优替代路径，重规划决策时间<30秒。",
-                                        "children": []
+                                        "children": [
+                                            {
+                                                "id": "fleet_status_input",
+                                                "label": "🚛 车队状态",
+                                                "status": "completed",
+                                                "summary": "获取车队当前位置（GPS精度<1m）、各车剩余电量、货物状态（冷链温度、振动水平）、车辆健康状态等实时数据。",
+                                                "children": []
+                                            },
+                                            {
+                                                "id": "map_anomaly_fusion",
+                                                "label": "🔗 地图与异常信息融合",
+                                                "status": "completed",
+                                                "summary": "将异常感知结果叠加至高精度地图，标注障碍区域与可通行边界，结合备选路线库，基于A*算法快速搜索最优替代路径，计算时间<30秒。",
+                                                "children": []
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -1345,12 +1390,12 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "道路损毁风险 + 冷链保护需求 → 分析各类地形场景 → 设计四类应对策略 → 形成自适应行进方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "terrain_input", "label": "地形感知输入\n(坡度,附着系数,水深)", "type": "input"},
-                            {"id": "low_speed_mode", "label": "低速稳态模式\n(坡度>15°→10km/h)", "type": "process"},
-                            {"id": "slope_control", "label": "坡度敏感控制\n(动力分配,制动回收)", "type": "process"},
-                            {"id": "water_bypass", "label": "涉水绕行策略\n(水深>40cm→绕行)", "type": "process"},
-                            {"id": "path_replan", "label": "路径重规划\n(障碍感知→新路径)", "type": "decision"},
-                            {"id": "strategy_output", "label": "行进策略输出\n(速度,路径,动力)", "type": "output"}
+                            {"id": "terrain_input", "label": "地形感知输入", "type": "input"},
+                            {"id": "low_speed_mode", "label": "低速稳态模式", "type": "process"},
+                            {"id": "slope_control", "label": "坡度敏感控制", "type": "process"},
+                            {"id": "water_bypass", "label": "涉水绕行策略", "type": "process"},
+                            {"id": "path_replan", "label": "路径重规划", "type": "decision"},
+                            {"id": "strategy_output", "label": "行进策略输出", "type": "output"}
                         ],
                         "edges": [
                             {"source": "terrain_input", "target": "low_speed_mode"},
@@ -1400,26 +1445,35 @@ SCENARIOS: List[Scenario] = [
                     "title": "路径重规划",
                     "summary": "基于实时感知的障碍信息，综合车队状态与地图数据生成新的可行路径。",
                     "key_points": [
-                        "触发条件：前方障碍物阻断当前路径、道路损毁超出通行能力、涉水绕行需求",
-                        "信息融合：综合侦察无人机数据、车载传感器、机器狗抵近观察结果、高精度地图",
-                        "重规划算法：基于A*算法的快速路径搜索，考虑距离、坡度、路况权重，决策时间<30秒",
-                        "车队协同：重规划结果同步至所有车辆，支持分段执行与汇合点设定"
+                        "路径规划：基于高精度地图（道路等级、坡度、路面类型）与实时路况（塌方、积水、施工标注）生成初始最优路径",
+                        "异常感知与处理：车载传感器检测到异常后，派遣机器狗抵近观察获取精确障碍信息",
+                        "动态重规划：综合车队状态（位置、电量、货物）、地图与异常信息，基于A*算法生成最优替代路径",
+                        "决策效率：从异常检测到新路径输出<30秒，结果同步至所有车辆导航系统"
                     ],
-                    "knowledge_trace": "障碍感知触发 → 多源信息融合 → 路径搜索算法 → 最优路径输出 → 车队同步执行。",
+                    "knowledge_trace": "路径规划（地图+路况）→ 异常感知与处理（感知异常→机器狗抵近）→ 动态重规划（车队状态+地图+异常融合）→ 新路径输出。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "path_base", "label": "路径规划（基础）\n(地图,路况)", "type": "input"},
-                            {"id": "anomaly_detect", "label": "异常感知与处理\n(感知异常→机器狗抵近)", "type": "process"},
-                            {"id": "info_fusion", "label": "信息融合\n(车队状态+地图+异常)", "type": "process"},
-                            {"id": "replan_algo", "label": "重规划算法\n(A*路径搜索)", "type": "decision"},
-                            {"id": "new_path", "label": "新路径输出\n(最优替代路径)", "type": "output"}
+                            {"id": "path_planning", "label": "路径规划", "type": "input"},
+                            {"id": "map_data", "label": "地图数据", "type": "input"},
+                            {"id": "road_condition", "label": "实时路况", "type": "input"},
+                            {"id": "anomaly_perception", "label": "异常感知与处理", "type": "process"},
+                            {"id": "anomaly_detection", "label": "感知数据异常", "type": "process"},
+                            {"id": "robot_dog", "label": "机器狗抵近观察", "type": "process"},
+                            {"id": "dynamic_replan", "label": "动态重规划", "type": "decision"},
+                            {"id": "fleet_status", "label": "车队状态", "type": "input"},
+                            {"id": "info_fusion", "label": "地图与异常融合", "type": "process"},
+                            {"id": "new_path", "label": "新路径输出", "type": "output"}
                         ],
                         "edges": [
-                            {"source": "path_base", "target": "anomaly_detect"},
-                            {"source": "anomaly_detect", "target": "info_fusion"},
-                            {"source": "info_fusion", "target": "replan_algo"},
-                            {"source": "replan_algo", "target": "new_path"},
-                            {"source": "path_base", "target": "info_fusion"}
+                            {"source": "map_data", "target": "path_planning"},
+                            {"source": "road_condition", "target": "path_planning"},
+                            {"source": "path_planning", "target": "anomaly_perception"},
+                            {"source": "anomaly_detection", "target": "anomaly_perception"},
+                            {"source": "robot_dog", "target": "anomaly_perception"},
+                            {"source": "anomaly_perception", "target": "dynamic_replan"},
+                            {"source": "fleet_status", "target": "dynamic_replan"},
+                            {"source": "info_fusion", "target": "dynamic_replan"},
+                            {"source": "dynamic_replan", "target": "new_path"}
                         ]
                     }
                 },
@@ -1456,6 +1510,78 @@ SCENARIOS: List[Scenario] = [
                     ],
                     "knowledge_trace": "多源信息输入 → 约束条件设定 → A*增量搜索 → 新路径验证 → 车队同步。"
                 },
+                "map_data": {
+                    "title": "地图数据",
+                    "summary": "加载高精度地图数据，提供路径规划的基础地理信息。",
+                    "key_points": [
+                        "地图精度：1:10000高精度地图，水平精度<1m，高程精度<0.5m",
+                        "道路信息：道路等级（高速/省道/县道/乡道）、车道数、路面宽度、限速信息",
+                        "地形数据：坡度信息（精度±0.5°）、路面类型（沥青/水泥/碎石/土路）、弯道曲率",
+                        "历史记录：历史损毁记录、维修状态、季节性风险（雨季易涝区、冬季结冰区）",
+                        "设施信息：桥梁涵洞位置与限高限重、充电站、应急停车区"
+                    ],
+                    "knowledge_trace": "地图数据库加载 → 道路网络解析 → 地形与设施信息提取 → 为路径规划提供基础数据。"
+                },
+                "road_condition_data": {
+                    "title": "实时路况",
+                    "summary": "获取并分析实时路况信息，标注高风险区域。",
+                    "key_points": [
+                        "数据来源：卫星影像（分辨率<1m）、历史通行数据、气象数据、交通管制信息",
+                        "更新频率：路况数据每5分钟更新一次，紧急事件实时推送",
+                        "风险标注：塌方区域（红色）、积水区域（蓝色）、施工区域（黄色）、拥堵区域（橙色）",
+                        "置信度评估：路况信息置信度>85%方可采信，低置信度区域触发主动探测",
+                        "预测能力：基于历史数据预测未来2小时路况变化趋势"
+                    ],
+                    "knowledge_trace": "多源路况数据采集 → 数据融合与验证 → 风险区域标注 → 置信度评估 → 路况预测。"
+                },
+                "anomaly_detection": {
+                    "title": "感知数据异常",
+                    "summary": "车载传感器实时检测前方道路异常情况。",
+                    "key_points": [
+                        "视觉异常：前方道路影像与地图不符、障碍物识别（车辆/落石/倒树）、路面破损检测",
+                        "雷达异常：激光雷达回波异常（可能有积水或坑洞）、障碍物体积超出通行空间",
+                        "路面异常：路面反射率异常（可能积水或结冰）、颠簸加速度超出阈值",
+                        "检测距离：视觉检测距离200m，激光雷达检测距离150m，超声波检测距离10m",
+                        "响应时间：异常检测到告警生成<100ms，为车辆预留充足反应时间"
+                    ],
+                    "knowledge_trace": "多传感器数据采集 → 异常特征提取 → 阈值判断 → 异常告警生成 → 触发后续处理。"
+                },
+                "robot_dog_scout": {
+                    "title": "派遣机器狗抵近观察",
+                    "summary": "当车载传感器无法准确判断时，派遣机器狗进行抵近侦察。",
+                    "key_points": [
+                        "派遣条件：车载传感器检测到异常但置信度<80%、障碍物性质不明、需要精确测量",
+                        "机器狗能力：四足行走（最高速度3m/s）、配备高清摄像头与激光测距仪、IP67防水",
+                        "观察距离：行进至异常点前方20m进行抵近观察，避免自身陷入危险",
+                        "采集内容：障碍物尺寸（精度±5cm）、材质识别、路面承载能力测试、积水深度测量、可通行宽度",
+                        "数据回传：采集数据实时回传至车队（延迟<500ms），支持远程操控与自主巡检两种模式"
+                    ],
+                    "knowledge_trace": "异常触发派遣 → 机器狗行进至观察点 → 多维度数据采集 → 实时数据回传 → 供重规划决策。"
+                },
+                "fleet_status_input": {
+                    "title": "车队状态",
+                    "summary": "获取车队实时状态数据，作为路径重规划的重要输入。",
+                    "key_points": [
+                        "位置信息：各车GPS位置（精度<1m）、行驶方向、当前速度",
+                        "能源状态：各车剩余电量百分比、预估剩余续航里程、能耗率",
+                        "货物状态：冷链温度（目标-18°C±2°C）、振动水平、货物完整性",
+                        "车辆健康：电机状态、电池健康度、传感器工作状态、轮胎气压",
+                        "约束计算：基于当前状态计算可行驶最大距离、允许的最大坡度、可通过的最大水深"
+                    ],
+                    "knowledge_trace": "各车状态数据采集 → 数据汇总至领航车 → 约束条件计算 → 为重规划提供边界条件。"
+                },
+                "map_anomaly_fusion": {
+                    "title": "地图与异常信息融合",
+                    "summary": "将异常感知结果与高精度地图融合，生成最优替代路径。",
+                    "key_points": [
+                        "信息叠加：将机器狗观察结果、车载传感器数据叠加至高精度地图，标注障碍区域边界",
+                        "可通行性分析：计算障碍区域的可通行边界，评估绕行代价（距离、时间、风险）",
+                        "备选路线评估：从备选路线库中筛选可行路线，按综合代价排序",
+                        "A*算法搜索：基于更新后的地图进行A*路径搜索，考虑距离、坡度、路况权重",
+                        "决策输出：计算时间<30秒，输出最优路径坐标序列、预估到达时间、风险评级"
+                    ],
+                    "knowledge_trace": "异常信息叠加至地图 → 可通行边界计算 → 备选路线筛选 → A*路径搜索 → 最优路径输出。"
+                },
                 "risk_mitigation": {
                     "title": "风险规避与冗余方案",
                     "summary": "通过前置侦察、多路径规划与补能保障，构建多层次的风险防控体系。",
@@ -1480,13 +1606,13 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "车辆配置 + 装车方案 + 行进策略 + 风险措施 → 编队与间隔设计 → 协同与监控方案 → 时间规划验证 → 形成可执行物流方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "task_parsing", "label": "任务解析\n((102,0)→(190,100),冷链+常温,2h)", "type": "input"},
-                            {"id": "vehicle_match", "label": "车辆匹配\n(4辆六轮越野,2冷链+2常温)", "type": "process"},
-                            {"id": "loading", "label": "装车方案\n(顺序,固定,配平,分配)", "type": "process"},
-                            {"id": "movement", "label": "行进策略推理\n(低速稳态,坡度控制,涉水绕行,路径重规划)", "type": "process"},
-                            {"id": "risk", "label": "风险规避\n(侦察无人机,备用路线,补能点)", "type": "process"},
-                            {"id": "execution", "label": "物流执行计划\n(批次,间隔,协同,监控)", "type": "decision"},
-                            {"id": "unloading", "label": "卸货操作\n(方式,顺序,确认,交接)", "type": "output"}
+                            {"id": "task_parsing", "label": "任务解析", "type": "input"},
+                            {"id": "vehicle_match", "label": "车辆匹配", "type": "process"},
+                            {"id": "loading", "label": "装车方案", "type": "process"},
+                            {"id": "movement", "label": "行进策略推理", "type": "process"},
+                            {"id": "risk", "label": "风险规避", "type": "process"},
+                            {"id": "execution", "label": "物流执行计划", "type": "decision"},
+                            {"id": "unloading", "label": "卸货操作", "type": "output"}
                         ],
                         "edges": [
                             {"source": "task_parsing", "target": "vehicle_match"},
@@ -1533,11 +1659,11 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "道路条件评估 → 编队模式选择 → 队形切换规则 → 协同动作库 → 通信协议保障。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "road_condition", "label": "道路条件\n(宽度,障碍,路况)", "type": "input"},
-                            {"id": "formation_plan", "label": "行进编队规划\n(单列/双列队形)", "type": "process"},
-                            {"id": "coord_actions", "label": "协同动作管理\n(掉头,倒置,避让)", "type": "process"},
-                            {"id": "v2v_comm", "label": "V2V通信\n(位置,状态同步)", "type": "process"},
-                            {"id": "formation_output", "label": "编队执行\n(队形,间距,动作)", "type": "output"}
+                            {"id": "road_condition", "label": "道路条件", "type": "input"},
+                            {"id": "formation_plan", "label": "行进编队规划", "type": "process"},
+                            {"id": "coord_actions", "label": "协同动作管理", "type": "process"},
+                            {"id": "v2v_comm", "label": "V2V通信", "type": "process"},
+                            {"id": "formation_output", "label": "编队执行", "type": "output"}
                         ],
                         "edges": [
                             {"source": "road_condition", "target": "formation_plan"},
@@ -1583,11 +1709,11 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "传感器数据采集 → 数据融合与分析 → 状态判别 → 异常检测 → 告警与处理。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "monitor_req", "label": "监控需求解析\n(车辆状态,温度,振动,能耗)", "type": "input"},
-                            {"id": "sensor_fusion", "label": "传感器数据融合\n(温度,GPS,IMU,健康监测)", "type": "process"},
-                            {"id": "status_judge", "label": "状态判别\n(温度异常,电量不足,偏移,振动)", "type": "process"},
-                            {"id": "anomaly_handle", "label": "异常处理策略\n(降速,换车,调路,检查)", "type": "decision"},
-                            {"id": "alert_log", "label": "告警与记录\n(分级告警,日志,指挥端同步)", "type": "output"}
+                            {"id": "monitor_req", "label": "监控需求解析", "type": "input"},
+                            {"id": "sensor_fusion", "label": "传感器数据融合", "type": "process"},
+                            {"id": "status_judge", "label": "状态判别", "type": "process"},
+                            {"id": "anomaly_handle", "label": "异常处理策略", "type": "decision"},
+                            {"id": "alert_log", "label": "告警与记录", "type": "output"}
                         ],
                         "edges": [
                             {"source": "monitor_req", "target": "sensor_fusion"},
@@ -1716,112 +1842,561 @@ SCENARIOS: List[Scenario] = [
     
     # 二、设备投放支援模型测试（7~12）
     Scenario(
-        id="equipment_fleet_formation",  # 5. 任务编组
+        id="equipment_deployment_strategy",  # 设备投放策略（综合场景）
         model_name="设备投放",
-        name="任务编组",
-        example_input="向X前沿阵地投放侦察装置Y，需要多架无人机协同运输",
-        reasoning_chain="任务解析（物资类型、重量与体积、投放精度需求、环境风险）→ 设备匹配（匹配适用的无人机或无人车类型）→ 数量推断（根据载荷能力与冗余策略推算所需设备数量）→ 投放方式生成（悬停投放/抛投/着陆放置等）",
+        name="设备投放策略",
+        example_input="（85,20）向前沿区域X（210,145）投放设备资源Y共2套，区域周边地形复杂且存在环境干扰风险，要求在确保作业安全的前提下于30分钟内完成部署。",
+        reasoning_chain="任务解析（设备类型、重量、功能、生存性要求、投放精度需求、环境风险）→ 设备匹配（匹配适用的无人车类型）→ 数量推断（根据载荷能力与冗余策略推算所需设备数量）→ 投放方式匹配（地面配送、自主装卸、协同投放）→ 目标定位（环境解析、传感器融合定位、误差纠正、定位结果生成）→ 投放位置优化（基于地形、目标定位、信号覆盖）→ 风险规避策略（选择低可探测路径、规避威胁区域、备用投放点设置）→ 自主装卸控制（装卸需求解析、动作规划、安全检测、装卸完成确认）→ 投放确认（结果感知、落点偏差分析、功能状态检查、投放成功判定）",
         prompt=(
-            "【设备投放-任务编组专项要求】\n"
-            "1. 行为树必须包含：task_analysis（解析物资类型、重量体积、投放精度需求、环境风险）→ "
-            "equipment_matching（匹配适用的无人机/无人车类型，说明选择理由）→ "
-            "quantity_inference（根据载荷能力与冗余策略推算设备数量）→ "
-            "delivery_method（生成投放方式：悬停投放/抛投/着陆放置等）→ "
-            "formation_result（编组结果汇总，包含 knowledge_graph）。\n"
-            "2. formation_result 的 knowledge_graph 应体现：任务解析 → 设备匹配 → 数量计算 → 投放方式选择 → 编组方案。"
+            "【设备投放-设备投放策略专项要求】\n"
+            "1. 行为树必须至少包含以下核心节点，严格按照推理链条自上而下展开：\n"
+            "   - task_analysis（任务解析）：解析设备类型（设备资源Y）、重量体积、功能、生存性要求、投放精度需求、环境干扰风险、时间约束（30分钟）；\n"
+            "   - equipment_matching（设备匹配）：基于地形与载重特点，选择适用的无人车类型（机器狗/六轮越野无人车），说明选择理由；\n"
+            "   - quantity_inference（数量推断）：根据载荷能力与冗余策略推算所需设备数量，确保2套设备安全运输；\n"
+            "   - delivery_method_matching（投放方式匹配）：决定投放方式（地面配送、自主装卸、协同投放）；\n"
+            "   - formation_summary（编组节点汇总）：汇总编组方案，必须包含 knowledge_graph；\n"
+            "   - deployment_strategy（设备投放策略，二级节点）：必须包含以下子节点：\n"
+            "       * target_localization（目标定位）：必须包含children以支持进一步展开，包含环境解析、传感器融合定位、误差纠正、定位结果生成；\n"
+            "       * position_optimization（投放位置优化）：基于地形、信号覆盖优化投放点；\n"
+            "       * risk_avoidance（风险规避策略）：低可探测路径选择、威胁区域规避、备用投放点设置；\n"
+            "   - autonomous_loading_control（自主装卸控制，核心节点）：必须包含以下子节点：\n"
+            "       * loading_requirement_analysis（装卸需求解析）：重量、尺寸、抓取方式；\n"
+            "       * motion_planning（动作规划）：机械臂抓取路径、姿态调整、力控策略；\n"
+            "       * safety_detection（安全检测）：防倾倒、防滑落、力反馈监测；\n"
+            "       * loading_confirmation（装卸完成确认）：识别设备是否已稳定装载/完成卸载；\n"
+            "       必须包含 knowledge_graph 字段。\n"
+            "   - deployment_confirmation（投放确认）：必须包含以下子节点：\n"
+            "       * result_perception（结果感知）：投放后图像、姿态信息、设备回传信号；\n"
+            "       * landing_deviation_analysis（落点偏差分析）：比较实际坐标与目标坐标；\n"
+            "       * function_status_check（功能状态检查）：是否正常通电、是否建立通信链路；\n"
+            "       * deployment_success_judgment（投放成功判定）：成功/失败/需重投；\n"
+            "       必须包含 knowledge_graph 字段。\n"
+            "2. target_localization 节点的 knowledge_graph 必须体现：环境解析 → 传感器融合定位 → 误差纠正 → 定位结果生成。\n"
+            "3. autonomous_loading_control 节点的 knowledge_graph 必须体现：装卸需求解析 → 动作规划 → 安全检测 → 装卸完成确认。\n"
+            "4. deployment_confirmation 节点的 knowledge_graph 必须体现：结果感知 → 落点偏差分析 → 功能状态检查 → 投放成功判定。\n"
+            "5. 在 node_insights 中，所有节点的 knowledge_trace 必须体现完整推理路径。\n"
+            "6. 注意：本场景预设是在平整地面进行设备投放，使用无人车/机器狗，并非使用无人机。"
         ),
         example_output={
-            "default_focus": "formation_result",
+            "default_focus": "deployment_strategy",
             "behavior_tree": {
                 "id": "task_analysis",
-                "label": "📦 任务解析：向X前沿阵地投放侦察装置Y",
+                "label": "📦 任务解析：设备投放部署任务",
                 "status": "completed",
-                "summary": "解析侦察装置Y的重量体积、投放精度需求与前沿阵地环境风险，为后续设备匹配与数量推断提供约束条件。",
+                "summary": "解析从(85,20)向前沿区域X(210,145)投放设备资源Y共2套的任务，区域周边地形复杂且存在环境干扰风险，要求30分钟内完成部署。运输距离约156km，需考虑设备安全与精确投放。",
                 "children": [
                     {
                         "id": "equipment_matching",
-                        "label": "设备匹配",
+                        "label": "🚗 设备匹配：2辆六轮越野无人车+1只机器狗",
                         "status": "completed",
-                        "summary": "在可用无人机/无人车中筛选适合携带侦察装置Y并满足投放精度需求的平台。",
+                        "summary": "基于156km运输距离、30分钟时限与复杂地形，选择2辆六轮越野无人车（各载1套设备Y）+1只机器狗（用于抵近侦察与精确定位），理由：六轮设计具备良好通过性与稳定性，机器狗适应复杂地形进行目标定位。",
                         "children": []
                     },
                     {
                         "id": "quantity_inference",
-                        "label": "数量推断",
+                        "label": "🔢 数量推断：2辆无人车+1只机器狗",
                         "status": "completed",
-                        "summary": "结合装置Y重量体积与单台平台载荷能力，叠加冗余策略推算所需设备数量。",
+                        "summary": "设备资源Y单套重量约30kg，单车载重能力80kg，考虑运输安全余量（载重利用率70%），每车携带1套设备Y。增加1辆备用车应对故障，配置1只机器狗用于精确定位与辅助作业。最终编组：3辆六轮越野无人车（2主1备）+1只机器狗。",
                         "children": []
                     },
                     {
-                        "id": "delivery_method",
-                        "label": "投放方式生成",
+                        "id": "delivery_method_matching",
+                        "label": "📍 投放方式匹配：地面配送+自主装卸",
                         "status": "completed",
-                        "summary": "根据环境风险与投放精度选取悬停投放或低空抛投等方式。",
+                        "summary": "基于平整地面投放环境与设备精度要求，选择地面配送+自主装卸方式。无人车到达投放点后，通过车载机械臂自主完成设备卸载与部署定位，机器狗辅助进行精确定位校准。",
                         "children": []
                     },
                     {
-                        "id": "formation_result",
-                        "label": "✅ 编组结果汇总",
+                        "id": "formation_summary",
+                        "label": "✅ 编组节点汇总",
+                        "status": "completed",
+                        "summary": "形成由2辆六轮越野无人车（主力运输）+1辆备用车+1只机器狗（定位辅助）构成的投放编组，明确各自职责与协同方式。",
+                        "children": []
+                    },
+                    {
+                        "id": "deployment_strategy",
+                        "label": "🎯 设备投放策略",
                         "status": "active",
-                        "summary": "形成由多架小型多旋翼无人机构成的投放编组，并明确各自装载份额与投放方式。",
-                        "children": []
+                        "summary": "生成包含目标定位、投放位置优化与风险规避的完整投放策略，确保设备资源Y能够安全、准确、高效地投放至前沿区域X(210,145)。",
+                        "children": [
+                            {
+                                "id": "target_localization",
+                                "label": "📍 目标定位",
+                                "status": "completed",
+                                "summary": "通过环境解析、多源传感器融合与误差纠正，实现前沿区域X(210,145)投放点的高精度定位。支持进一步展开查看详细定位流程。",
+                                "children": [
+                                    {
+                                        "id": "environment_analysis",
+                                        "label": "🗺️ 环境解析",
+                                        "status": "completed",
+                                        "summary": "读取前沿区域X的高精度地图（1:5000）、地物特征（建筑物、植被、道路）、遮挡信息（视线遮挡区、信号盲区），识别可能的投放候选点。",
+                                        "children": [
+                                            {
+                                                "id": "map_reading",
+                                                "label": "🗺️ 地图读取",
+                                                "status": "completed",
+                                                "summary": "加载1:5000高精度地图，包含地形高程、道路网络、建筑物轮廓、植被分布等信息，地图精度<0.5m。",
+                                                "children": []
+                                            },
+                                            {
+                                                "id": "terrain_feature",
+                                                "label": "🏔️ 地物特征识别",
+                                                "status": "completed",
+                                                "summary": "识别目标区域周边的显著地物特征：建筑物（可作为参照物）、植被（可能遮挡信号）、平整地面区域（适合投放）。",
+                                                "children": []
+                                            },
+                                            {
+                                                "id": "occlusion_analysis",
+                                                "label": "🚧 遮挡信息分析",
+                                                "status": "completed",
+                                                "summary": "分析视线遮挡区（影响视觉定位）、信号盲区（影响通信回传）、GPS多径效应区（影响定位精度），标注需规避区域。",
+                                                "children": []
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "sensor_fusion_localization",
+                                        "label": "📡 传感器融合定位",
+                                        "status": "completed",
+                                        "summary": "利用机器狗搭载的视觉相机、激光雷达、深度感知等多源传感器进行目标点推断，定位精度达到±0.3m。",
+                                        "children": [
+                                            {
+                                                "id": "visual_recognition",
+                                                "label": "👁️ 视觉识别",
+                                                "status": "completed",
+                                                "summary": "机器狗高清摄像头（4K分辨率）识别预设地面标记物（反光标识、颜色标记），视觉定位精度±0.5m。",
+                                                "children": []
+                                            },
+                                            {
+                                                "id": "lidar_ranging",
+                                                "label": "📏 激光雷达测距",
+                                                "status": "completed",
+                                                "summary": "16线激光雷达扫描周边环境，构建3D点云地图，测距精度±2cm，有效距离100m。",
+                                                "children": []
+                                            },
+                                            {
+                                                "id": "depth_perception",
+                                                "label": "🔍 深度感知",
+                                                "status": "completed",
+                                                "summary": "双目深度相机获取场景深度信息，结合点云数据进行三维重建，识别地面平整度与可投放区域。",
+                                                "children": []
+                                            },
+                                            {
+                                                "id": "data_fusion",
+                                                "label": "🔗 多源数据融合",
+                                                "status": "completed",
+                                                "summary": "采用扩展卡尔曼滤波（EKF）融合视觉、激光雷达、深度感知与IMU数据，输出融合定位结果，精度±0.3m。",
+                                                "children": []
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "error_correction",
+                                        "label": "🔧 误差纠正",
+                                        "status": "completed",
+                                        "summary": "基于地面标志物（预设反光标识）进行定位偏差修正，消除累积误差与系统偏差，最终定位精度达到±0.1m。",
+                                        "children": [
+                                            {
+                                                "id": "marker_detection",
+                                                "label": "🎯 标志物检测",
+                                                "status": "completed",
+                                                "summary": "机器狗视觉系统检测预设地面反光标识（棋盘格图案），提取标识中心点坐标作为参考基准。",
+                                                "children": []
+                                            },
+                                            {
+                                                "id": "deviation_calculation",
+                                                "label": "📐 偏差计算",
+                                                "status": "completed",
+                                                "summary": "比较融合定位结果与标志物基准坐标，计算水平偏差（ΔX, ΔY）与航向偏差（Δθ）。",
+                                                "children": []
+                                            },
+                                            {
+                                                "id": "correction_application",
+                                                "label": "✅ 偏差修正",
+                                                "status": "completed",
+                                                "summary": "将计算的偏差值反向补偿至定位结果，更新坐标系变换矩阵，校正后定位精度±0.1m。",
+                                                "children": []
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "localization_result",
+                                        "label": "📍 定位结果生成",
+                                        "status": "completed",
+                                        "summary": "输出目标投放点的精确坐标(210.05, 145.02)，定位精度±0.1m，置信度98%，同步发送至无人车导航系统。",
+                                        "children": []
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "position_optimization",
+                                "label": "📐 投放位置优化",
+                                "status": "completed",
+                                "summary": "基于地形分析、目标定位结果与信号覆盖评估，优化最终投放点位置，确保设备部署后功能正常。",
+                                "children": [
+                                    {
+                                        "id": "terrain_suitability",
+                                        "label": "🏔️ 地形适宜性评估",
+                                        "status": "completed",
+                                        "summary": "评估候选投放点的地面平整度（坡度<5°）、承载能力（>100kg/m²）、排水条件，选择最优投放位置。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "signal_coverage",
+                                        "label": "📶 信号覆盖评估",
+                                        "status": "completed",
+                                        "summary": "检测投放点的通信信号强度（4G/5G信号>-85dBm）、GPS信号质量（HDOP<2.0），确保设备部署后通信正常。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "final_position",
+                                        "label": "✅ 最终位置确定",
+                                        "status": "completed",
+                                        "summary": "综合地形、信号与安全因素，确定最终投放点坐标(210.05, 145.02)，偏离初始目标0.07m，满足投放精度要求。",
+                                        "children": []
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "risk_avoidance",
+                                "label": "⚠️ 风险规避策略",
+                                "status": "completed",
+                                "summary": "制定包含低可探测路径选择、威胁区域规避与备用投放点设置的多层次风险规避方案。",
+                                "children": [
+                                    {
+                                        "id": "low_detectability_path",
+                                        "label": "🛤️ 低可探测路径",
+                                        "status": "completed",
+                                        "summary": "规划利用地形遮蔽的行进路径，优先选择山脊背面、树林边缘等低可探测区域，降低被发现概率。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "threat_zone_bypass",
+                                        "label": "🚫 威胁区域规避",
+                                        "status": "completed",
+                                        "summary": "标注环境干扰风险区域（电磁干扰区、不稳定地形区），规划绕行路径，安全距离>50m。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "backup_deployment_point",
+                                        "label": "📍 备用投放点设置",
+                                        "status": "completed",
+                                        "summary": "预设2个备用投放点（距主投放点100m和200m），当主投放点不可用时自动切换，切换决策时间<30秒。",
+                                        "children": []
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "id": "autonomous_loading_control",
+                        "label": "🦾 自主装卸控制",
+                        "status": "active",
+                        "summary": "控制无人车车载机械臂自主完成设备资源Y的装载与卸载动作，确保设备安全转移与精确放置。",
+                        "children": [
+                            {
+                                "id": "loading_requirement_analysis",
+                                "label": "📋 装卸需求解析",
+                                "status": "completed",
+                                "summary": "解析设备资源Y的物理特性：重量30kg、尺寸40×30×25cm、抓取方式（侧面夹持+底部托举）。",
+                                "children": [
+                                    {
+                                        "id": "weight_analysis",
+                                        "label": "⚖️ 重量分析",
+                                        "status": "completed",
+                                        "summary": "设备资源Y单套重量30kg，重心位于几何中心偏下5cm，需采用平衡抓取策略。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "dimension_analysis",
+                                        "label": "📏 尺寸分析",
+                                        "status": "completed",
+                                        "summary": "设备外形尺寸40×30×25cm，外壳材质为铝合金，表面有防滑纹理，适合机械夹持。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "grip_method",
+                                        "label": "🤖 抓取方式确定",
+                                        "status": "completed",
+                                        "summary": "采用侧面夹持（夹持力50-80N）+底部托举（托力>350N）的复合抓取方式，确保设备稳定。",
+                                        "children": []
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "motion_planning",
+                                "label": "🎯 动作规划",
+                                "status": "completed",
+                                "summary": "规划机械臂从车载位置到投放点的完整运动轨迹，包括抓取路径、姿态调整与力控策略。",
+                                "children": [
+                                    {
+                                        "id": "arm_trajectory",
+                                        "label": "🦾 机械臂抓取路径",
+                                        "status": "completed",
+                                        "summary": "六自由度机械臂从初始位置运动至设备位置，采用五次多项式轨迹规划，运动平滑无冲击，全程耗时8秒。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "pose_adjustment",
+                                        "label": "📐 姿态调整",
+                                        "status": "completed",
+                                        "summary": "根据设备当前姿态与目标放置姿态，计算末端执行器的旋转变换（Roll/Pitch/Yaw），调整精度±1°。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "force_control",
+                                        "label": "💪 力控策略",
+                                        "status": "completed",
+                                        "summary": "采用阻抗控制模式，设置刚度系数K=500N/m、阻尼系数B=50Ns/m，实现柔顺接触与安全放置。",
+                                        "children": []
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "safety_detection",
+                                "label": "🛡️ 安全检测",
+                                "status": "completed",
+                                "summary": "实时监测装卸过程中的安全状态，包括防倾倒、防滑落与力反馈监测。",
+                                "children": [
+                                    {
+                                        "id": "anti_tipping",
+                                        "label": "⚖️ 防倾倒检测",
+                                        "status": "completed",
+                                        "summary": "IMU实时监测设备倾斜角度，当倾斜>15°时触发防护动作（降低移动速度、调整抓取姿态）。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "anti_slip",
+                                        "label": "🔒 防滑落检测",
+                                        "status": "completed",
+                                        "summary": "夹持力传感器监测抓取力变化，当检测到力突降>20%时判定为滑落风险，自动增加夹持力或暂停动作。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "force_feedback",
+                                        "label": "📊 力反馈监测",
+                                        "status": "completed",
+                                        "summary": "六维力传感器实时监测末端力矩（Fx/Fy/Fz/Mx/My/Mz），当任意方向力超过安全阈值（100N/10Nm）时触发紧急停止。",
+                                        "children": []
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "loading_confirmation",
+                                "label": "✅ 装卸完成确认",
+                                "status": "completed",
+                                "summary": "通过多传感器验证设备是否已稳定装载或完成卸载，生成装卸完成状态报告。",
+                                "children": [
+                                    {
+                                        "id": "position_verification",
+                                        "label": "📍 位置验证",
+                                        "status": "completed",
+                                        "summary": "视觉系统确认设备已放置于目标位置，位置偏差<5cm，姿态偏差<3°。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "stability_check",
+                                        "label": "⚖️ 稳定性检查",
+                                        "status": "completed",
+                                        "summary": "机械臂缓慢释放夹持力，IMU监测设备5秒内无位移变化（<1mm），确认设备稳定放置。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "loading_status_report",
+                                        "label": "📋 装卸状态报告",
+                                        "status": "completed",
+                                        "summary": "生成装卸完成报告：设备编号、放置坐标、放置时间、姿态参数、稳定性评估结果，上传至指挥端。",
+                                        "children": []
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "id": "deployment_confirmation",
+                        "label": "🔍 投放确认",
+                        "status": "pending",
+                        "summary": "通过视觉、位姿与通信回传等方式自动确认设备投放结果，判定投放成功与否。",
+                        "children": [
+                            {
+                                "id": "result_perception",
+                                "label": "👁️ 结果感知",
+                                "status": "pending",
+                                "summary": "采集投放后的设备状态信息，包括图像、姿态与设备回传信号。",
+                                "children": [
+                                    {
+                                        "id": "post_deployment_image",
+                                        "label": "📷 投放后图像采集",
+                                        "status": "pending",
+                                        "summary": "机器狗高清摄像头拍摄设备部署后的全景图像与特写图像，用于视觉确认与存档。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "pose_information",
+                                        "label": "📐 姿态信息获取",
+                                        "status": "pending",
+                                        "summary": "通过视觉与激光雷达测量设备当前姿态（位置+方向），与目标姿态进行比对。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "device_signal",
+                                        "label": "📶 设备回传信号",
+                                        "status": "pending",
+                                        "summary": "检测设备Y是否开始发送心跳信号（每5秒一次），确认设备已激活并进入工作状态。",
+                                        "children": []
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "landing_deviation_analysis",
+                                "label": "📏 落点偏差分析",
+                                "status": "pending",
+                                "summary": "比较设备实际放置坐标与目标坐标，计算水平偏差与航向偏差。",
+                                "children": [
+                                    {
+                                        "id": "actual_coordinate",
+                                        "label": "📍 实际坐标测量",
+                                        "status": "pending",
+                                        "summary": "通过RTK-GPS与视觉定位融合，测量设备实际放置坐标，精度±5cm。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "deviation_calculation_deploy",
+                                        "label": "📐 偏差计算",
+                                        "status": "pending",
+                                        "summary": "计算实际坐标(210.08, 145.01)与目标坐标(210.05, 145.02)的偏差：水平偏差3.2cm，满足精度要求（<10cm）。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "heading_deviation",
+                                        "label": "🧭 航向偏差",
+                                        "status": "pending",
+                                        "summary": "测量设备实际朝向与目标朝向的角度差，偏差1.5°，满足精度要求（<5°）。",
+                                        "children": []
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "function_status_check",
+                                "label": "🔌 功能状态检查",
+                                "status": "pending",
+                                "summary": "检查设备是否正常通电、是否建立通信链路，验证设备功能完整性。",
+                                "children": [
+                                    {
+                                        "id": "power_status",
+                                        "label": "🔋 通电状态",
+                                        "status": "pending",
+                                        "summary": "检测设备电源指示灯状态（绿色常亮=正常），电池电量>90%，供电电压12.1V正常。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "communication_link",
+                                        "label": "📡 通信链路",
+                                        "status": "pending",
+                                        "summary": "验证设备与指挥端的通信链路：4G信号强度-72dBm，心跳包传输正常，延迟<200ms。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "sensor_self_test",
+                                        "label": "🔍 传感器自检",
+                                        "status": "pending",
+                                        "summary": "设备执行传感器自检程序，所有传感器（摄像头、麦克风、温湿度计）工作正常，自检通过。",
+                                        "children": []
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "deployment_success_judgment",
+                                "label": "✅ 投放成功判定",
+                                "status": "pending",
+                                "summary": "综合落点偏差、功能状态等信息，判定投放结果为成功/失败/需重投。",
+                                "children": [
+                                    {
+                                        "id": "criteria_evaluation",
+                                        "label": "📋 判定标准评估",
+                                        "status": "pending",
+                                        "summary": "评估各项指标：位置偏差3.2cm(<10cm✓)、航向偏差1.5°(<5°✓)、通电正常✓、通信正常✓、传感器自检通过✓。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "final_judgment",
+                                        "label": "🏁 最终判定",
+                                        "status": "pending",
+                                        "summary": "所有判定标准均满足，投放结果判定为【成功】，生成投放完成报告并上传指挥端。",
+                                        "children": []
+                                    },
+                                    {
+                                        "id": "retry_strategy",
+                                        "label": "🔄 重投策略（备用）",
+                                        "status": "pending",
+                                        "summary": "若判定失败，启动重投流程：分析失败原因、调整投放参数、切换备用投放点（如需要）、执行重新投放。",
+                                        "children": []
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ]
             },
             "node_insights": {
                 "task_analysis": {
                     "title": "任务解析",
-                    "summary": "围绕“向X前沿阵地投放侦察装置Y，需要多架无人机协同运输”的描述，抽取物资属性与作战环境约束。",
+                    "summary": "从任务文本中提取起点(85,20)、目标区域X(210,145)、设备资源Y（2套）、地形特征（复杂）、环境风险（干扰风险）、时间约束（30分钟）。",
                     "key_points": [
-                        "识别侦察装置Y的重量、尺寸与安装接口约束",
-                        "明确前沿阵地对投放位置误差、落点安全区的精度需求",
-                        "分析环境风险，如敌情威胁、高风区、地形遮挡等"
+                        "起点坐标(85,20)，目标区域X坐标(210,145)，直线距离约156km",
+                        "设备资源Y共2套，需确保运输安全与投放精度",
+                        "时间约束：30分钟内完成部署，平均速度需>300km/h（不现实，需多车协同或分阶段部署）",
+                        "风险因素：地形复杂、存在环境干扰风险，需预留备用投放点与应急方案"
                     ],
-                    "knowledge_trace": "任务文本 → 物资属性 + 精度 + 环境风险三类要素抽取 → 为设备匹配与数量推断节点提供统一输入。"
+                    "knowledge_trace": "任务文本 → 坐标/距离/设备/时限/风险要素提取 → 形成任务约束条件 → 为后续设备匹配与策略生成提供输入。"
                 },
                 "equipment_matching": {
                     "title": "设备匹配",
-                    "summary": "在候选平台中，选出既能安全携带侦察装置Y，又能达到目标区域的无人机/无人车配置。",
+                    "summary": "基于复杂地形、投放精度需求与设备重量，选择六轮越野无人车+机器狗的组合方案。",
                     "key_points": [
-                        "比较多旋翼无人机、固定翼无人机与地面无人车的载荷与航程能力",
-                        "考虑起降条件与前沿阵地的地形限制，倾向选择垂直起降平台",
-                        "优先选用具备稳定悬停能力的平台以满足投放精度需求"
+                        "六轮越野无人车：最高时速60km/h，续航150km，载重能力80kg，具备良好通过性（爬坡能力30°）",
+                        "机器狗：四足行走适应复杂地形，搭载高精度传感器用于目标定位，最高速度3m/s",
+                        "选择理由：六轮设计提供稳定运输能力，机器狗实现复杂地形下的精确定位与辅助作业",
+                        "注意：本场景在平整地面进行设备投放，不使用无人机"
                     ],
-                    "knowledge_trace": "载荷与精度需求 → 平台能力对比 → 选定多旋翼/复合翼等具体机型。"
+                    "knowledge_trace": "运输距离+地形约束 → 平台能力分析 → 选择六轮越野无人车（运输）+ 机器狗（定位）组合方案。"
                 },
                 "quantity_inference": {
                     "title": "数量推断",
-                    "summary": "依据装置Y重量体积与单机载荷，叠加冗余比例，推算所需无人机数量。",
+                    "summary": "依据设备Y重量体积与单车载荷，叠加冗余策略，推算所需无人车与机器狗数量。",
                     "key_points": [
-                        "计算单架无人机在安全余量下可携带的装置数量或重量",
-                        "按总任务载荷除以单机有效载荷得到理论最少架数",
-                        "在理论值基础上增加一定比例冗余以应对故障或返航失败"
+                        "设备资源Y单套重量约30kg，体积40×30×25cm",
+                        "单车有效载荷：80kg×70%=56kg（考虑安全余量）",
+                        "运输需求：2套设备Y（共60kg），需2辆无人车（各携带1套）",
+                        "冗余配置：增加1辆备用车+1只机器狗，最终编组3辆无人车+1只机器狗"
                     ],
-                    "knowledge_trace": "物资总载荷建模 → 理论平台数计算 → 冗余策略叠加 → 得到最终编组数量。"
+                    "knowledge_trace": "设备总载荷计算 → 单车有效载荷评估 → 理论数量计算 → 冗余策略叠加 → 最终编组数量。"
                 },
-                "delivery_method": {
-                    "title": "投放方式生成",
-                    "summary": "在安全与精度约束下，确定装置Y采用悬停投放、低空抛投或着陆放置等方式。",
+                "delivery_method_matching": {
+                    "title": "投放方式匹配",
+                    "summary": "在平整地面投放环境下，选择地面配送+自主装卸的投放方式。",
                     "key_points": [
-                        "若前沿阵地周边存在敌情威胁，优先选择短停或抛投方式缩短暴露时间",
-                        "对高精度需求任务，倾向选择悬停慢速下放或短暂着陆放置",
-                        "综合风场、地形遮挡等因素，评估各方式对落点偏差的影响"
+                        "地面配送：无人车直接将设备运输至投放点附近",
+                        "自主装卸：车载机械臂自主完成设备卸载与精确放置",
+                        "协同投放：机器狗提供精确定位引导，无人车执行放置动作",
+                        "选择理由：平整地面条件良好，自主装卸可实现高精度投放（<10cm）"
                     ],
-                    "knowledge_trace": "环境风险 + 精度要求 → 候选投放方式评估 → 选定最优或组合方案。"
+                    "knowledge_trace": "环境条件评估 → 候选投放方式分析 → 精度需求匹配 → 选定地面配送+自主装卸方案。"
                 },
-                "formation_result": {
-                    "title": "编组结果汇总",
-                    "summary": "将任务解析、设备匹配、数量推断和投放方式四个环节的结论汇总为可执行的编组方案。",
+                "formation_summary": {
+                    "title": "编组节点汇总",
+                    "summary": "将任务解析、设备匹配、数量推断和投放方式的结论汇总为可执行的编组方案。",
                     "key_points": [
-                        "明确编组中各无人机的型号、数量与各自装载份额",
-                        "为每台平台绑定具体的投放方式与执行顺序",
-                        "为后续任务流程提供结构化的编组描述，可直接用于调度与可视化"
+                        "编组构成：2辆六轮越野无人车（主力运输）+1辆备用车+1只机器狗（定位辅助）",
+                        "任务分工：主力车各载1套设备Y，备用车待命，机器狗先行进行目标定位",
+                        "协同方式：机器狗引导→无人车到位→自主装卸→投放确认",
+                        "时间规划：机器狗先行（10分钟）+无人车运输（15分钟）+装卸投放（5分钟）=30分钟"
                     ],
-                    "knowledge_trace": "任务要素 → 设备匹配 → 数量与方式推断 → 汇总为编组蓝图。",
+                    "knowledge_trace": "任务要素 → 设备匹配 → 数量与方式推断 → 汇总为编组方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "task_analysis", "label": "任务解析(装置Y, 前沿阵地X)", "type": "input"},
-                            {"id": "equipment_matching", "label": "设备匹配(无人机/无人车)", "type": "process"},
+                            {"id": "task_analysis", "label": "任务解析(设备Y, 区域X)", "type": "input"},
+                            {"id": "equipment_matching", "label": "设备匹配(无人车+机器狗)", "type": "process"},
                             {"id": "quantity_inference", "label": "数量计算(载荷+冗余)", "type": "process"},
                             {"id": "delivery_method", "label": "投放方式选择", "type": "decision"},
                             {"id": "formation_plan", "label": "编组方案输出", "type": "output"}
@@ -1833,6 +2408,284 @@ SCENARIOS: List[Scenario] = [
                             {"source": "delivery_method", "target": "formation_plan"}
                         ]
                     }
+                },
+                "deployment_strategy": {
+                    "title": "设备投放策略",
+                    "summary": "整合目标定位、投放位置优化与风险规避措施，生成完整的设备投放执行方案。",
+                    "key_points": [
+                        "目标定位：机器狗多源传感器融合实现±0.1m精度定位",
+                        "位置优化：综合地形、信号覆盖优化最终投放点",
+                        "风险规避：低可探测路径+威胁区域规避+备用投放点",
+                        "执行流程：定位→优化→规避→装卸→确认"
+                    ],
+                    "knowledge_trace": "编组方案 + 目标定位 + 位置优化 + 风险规避 → 形成可执行投放策略。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "formation", "label": "编组方案", "type": "input"},
+                            {"id": "target_loc", "label": "目标定位", "type": "process"},
+                            {"id": "position_opt", "label": "投放位置优化", "type": "process"},
+                            {"id": "risk_avoid", "label": "风险规避策略", "type": "process"},
+                            {"id": "loading_ctrl", "label": "自主装卸控制", "type": "process"},
+                            {"id": "deploy_confirm", "label": "投放确认", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "formation", "target": "target_loc"},
+                            {"source": "target_loc", "target": "position_opt"},
+                            {"source": "position_opt", "target": "risk_avoid"},
+                            {"source": "risk_avoid", "target": "loading_ctrl"},
+                            {"source": "loading_ctrl", "target": "deploy_confirm"}
+                        ]
+                    }
+                },
+                "target_localization": {
+                    "title": "目标定位",
+                    "summary": "通过环境解析、多源传感器融合与误差纠正，实现目标投放点的高精度定位。",
+                    "key_points": [
+                        "环境解析：读取高精度地图、识别地物特征、分析遮挡信息",
+                        "传感器融合：机器狗视觉+激光雷达+深度感知+IMU数据融合，精度±0.3m",
+                        "误差纠正：基于地面标志物进行偏差修正，最终精度±0.1m",
+                        "定位结果：输出精确坐标与置信度，用于投放位置优化"
+                    ],
+                    "knowledge_trace": "环境解析 → 传感器融合定位 → 误差纠正 → 定位结果生成。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "env_analysis", "label": "环境解析", "type": "input"},
+                            {"id": "map_read", "label": "地图读取", "type": "input"},
+                            {"id": "terrain_feat", "label": "地物特征识别", "type": "input"},
+                            {"id": "occlusion", "label": "遮挡信息分析", "type": "input"},
+                            {"id": "sensor_fusion", "label": "传感器融合定位", "type": "process"},
+                            {"id": "visual", "label": "视觉识别", "type": "process"},
+                            {"id": "lidar", "label": "激光雷达测距", "type": "process"},
+                            {"id": "depth", "label": "深度感知", "type": "process"},
+                            {"id": "error_corr", "label": "误差纠正", "type": "process"},
+                            {"id": "loc_result", "label": "定位结果生成", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "map_read", "target": "env_analysis"},
+                            {"source": "terrain_feat", "target": "env_analysis"},
+                            {"source": "occlusion", "target": "env_analysis"},
+                            {"source": "env_analysis", "target": "sensor_fusion"},
+                            {"source": "visual", "target": "sensor_fusion"},
+                            {"source": "lidar", "target": "sensor_fusion"},
+                            {"source": "depth", "target": "sensor_fusion"},
+                            {"source": "sensor_fusion", "target": "error_corr"},
+                            {"source": "error_corr", "target": "loc_result"}
+                        ]
+                    }
+                },
+                "environment_analysis": {
+                    "title": "环境解析",
+                    "summary": "读取目标区域的地图、地物特征与遮挡信息，为传感器融合定位提供先验知识。",
+                    "key_points": [
+                        "地图数据：1:5000高精度地图，包含地形高程、道路、建筑物、植被分布",
+                        "地物特征：识别可作为参照物的显著地标（建筑物角点、道路交叉口）",
+                        "遮挡分析：标注视线遮挡区（影响视觉定位）、信号盲区（影响通信）、GPS多径区"
+                    ],
+                    "knowledge_trace": "地图加载 → 地物特征提取 → 遮挡区域标注 → 形成环境先验模型。"
+                },
+                "sensor_fusion_localization": {
+                    "title": "传感器融合定位",
+                    "summary": "融合机器狗搭载的多源传感器数据，实现目标点的高精度推断。",
+                    "key_points": [
+                        "视觉识别：4K摄像头识别预设标记，视觉定位精度±0.5m",
+                        "激光雷达：16线LiDAR构建3D点云，测距精度±2cm",
+                        "深度感知：双目相机获取场景深度，识别地面平整度",
+                        "数据融合：EKF算法融合多源数据，输出精度±0.3m"
+                    ],
+                    "knowledge_trace": "多传感器数据采集 → 特征提取 → EKF融合 → 融合定位结果输出。"
+                },
+                "error_correction": {
+                    "title": "误差纠正",
+                    "summary": "基于地面标志物进行定位偏差修正，消除累积误差与系统偏差。",
+                    "key_points": [
+                        "标志物检测：识别预设地面反光标识（棋盘格图案）",
+                        "偏差计算：比较融合结果与标志物基准，计算水平与航向偏差",
+                        "修正应用：反向补偿偏差值，校正后精度±0.1m"
+                    ],
+                    "knowledge_trace": "标志物检测 → 偏差计算 → 补偿修正 → 输出高精度定位结果。"
+                },
+                "localization_result": {
+                    "title": "定位结果生成",
+                    "summary": "输出目标投放点的精确坐标，附带精度评估与置信度指标。",
+                    "key_points": [
+                        "坐标输出：目标点精确坐标(210.05, 145.02)，坐标系WGS84",
+                        "精度评估：水平精度±0.1m，航向精度±0.5°",
+                        "置信度：定位置信度98%，满足投放精度要求",
+                        "数据同步：定位结果实时同步至无人车导航系统"
+                    ],
+                    "knowledge_trace": "误差纠正后数据 → 坐标格式转换 → 精度与置信度评估 → 结果输出与同步。"
+                },
+                "position_optimization": {
+                    "title": "投放位置优化",
+                    "summary": "基于地形、信号覆盖等因素，优化最终投放点位置。",
+                    "key_points": [
+                        "地形适宜性：坡度<5°、承载力>100kg/m²、排水良好",
+                        "信号覆盖：4G/5G信号>-85dBm、GPS HDOP<2.0",
+                        "综合优化：在满足精度要求前提下选择最优投放位置"
+                    ],
+                    "knowledge_trace": "定位结果 + 地形评估 + 信号评估 → 综合优化 → 最终位置确定。"
+                },
+                "risk_avoidance": {
+                    "title": "风险规避策略",
+                    "summary": "制定多层次风险规避方案，确保投放任务安全完成。",
+                    "key_points": [
+                        "低可探测路径：利用地形遮蔽规划行进路径，降低被发现概率",
+                        "威胁区域规避：标注电磁干扰区、不稳定地形区，安全距离>50m",
+                        "备用投放点：预设2个备用点，切换决策时间<30秒"
+                    ],
+                    "knowledge_trace": "威胁识别 → 路径规划 → 区域规避 → 备用点设置 → 形成风险规避方案。"
+                },
+                "autonomous_loading_control": {
+                    "title": "自主装卸控制",
+                    "summary": "控制无人车机械臂自主完成设备装载与卸载，确保设备安全转移与精确放置。",
+                    "key_points": [
+                        "装卸需求解析：设备重量30kg、尺寸40×30×25cm、侧面夹持+底部托举",
+                        "动作规划：五次多项式轨迹规划、姿态调整精度±1°、阻抗力控",
+                        "安全检测：防倾倒（>15°触发）、防滑落（力突降>20%触发）、力反馈监测",
+                        "装卸确认：位置偏差<5cm、姿态偏差<3°、5秒稳定性验证"
+                    ],
+                    "knowledge_trace": "装卸需求解析 → 动作规划 → 安全检测 → 装卸完成确认。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "load_req", "label": "装卸需求解析", "type": "input"},
+                            {"id": "weight", "label": "重量分析", "type": "input"},
+                            {"id": "dimension", "label": "尺寸分析", "type": "input"},
+                            {"id": "grip", "label": "抓取方式", "type": "input"},
+                            {"id": "motion_plan", "label": "动作规划", "type": "process"},
+                            {"id": "trajectory", "label": "机械臂轨迹", "type": "process"},
+                            {"id": "pose_adj", "label": "姿态调整", "type": "process"},
+                            {"id": "force_ctrl", "label": "力控策略", "type": "process"},
+                            {"id": "safety_det", "label": "安全检测", "type": "decision"},
+                            {"id": "load_confirm", "label": "装卸完成确认", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "weight", "target": "load_req"},
+                            {"source": "dimension", "target": "load_req"},
+                            {"source": "grip", "target": "load_req"},
+                            {"source": "load_req", "target": "motion_plan"},
+                            {"source": "trajectory", "target": "motion_plan"},
+                            {"source": "pose_adj", "target": "motion_plan"},
+                            {"source": "force_ctrl", "target": "motion_plan"},
+                            {"source": "motion_plan", "target": "safety_det"},
+                            {"source": "safety_det", "target": "load_confirm"}
+                        ]
+                    }
+                },
+                "loading_requirement_analysis": {
+                    "title": "装卸需求解析",
+                    "summary": "解析设备资源Y的物理特性，确定抓取与放置方式。",
+                    "key_points": [
+                        "重量分析：单套30kg，重心偏下5cm，需平衡抓取",
+                        "尺寸分析：40×30×25cm，铝合金外壳，表面防滑纹理",
+                        "抓取方式：侧面夹持（50-80N）+ 底部托举（>350N）"
+                    ],
+                    "knowledge_trace": "设备规格获取 → 重量/尺寸分析 → 抓取方式确定 → 为动作规划提供参数。"
+                },
+                "motion_planning": {
+                    "title": "动作规划",
+                    "summary": "规划机械臂的完整运动轨迹，包括路径、姿态与力控。",
+                    "key_points": [
+                        "抓取路径：五次多项式轨迹规划，运动平滑，耗时8秒",
+                        "姿态调整：末端执行器Roll/Pitch/Yaw调整，精度±1°",
+                        "力控策略：阻抗控制模式，刚度K=500N/m，阻尼B=50Ns/m"
+                    ],
+                    "knowledge_trace": "装卸需求 → 轨迹规划 → 姿态计算 → 力控参数设置 → 完整动作序列。"
+                },
+                "safety_detection": {
+                    "title": "安全检测",
+                    "summary": "实时监测装卸过程中的安全状态，及时触发防护动作。",
+                    "key_points": [
+                        "防倾倒：IMU监测倾斜角，>15°触发降速/调整姿态",
+                        "防滑落：力传感器监测夹持力，突降>20%触发增力/暂停",
+                        "力反馈：六维力传感器监测，超阈值（100N/10Nm）触发急停"
+                    ],
+                    "knowledge_trace": "多传感器实时监测 → 阈值判断 → 防护动作触发 → 安全状态确认。"
+                },
+                "loading_confirmation": {
+                    "title": "装卸完成确认",
+                    "summary": "通过多传感器验证设备装卸状态，生成完成报告。",
+                    "key_points": [
+                        "位置验证：视觉确认设备位置偏差<5cm，姿态偏差<3°",
+                        "稳定性检查：释放夹持力后5秒内无位移变化（<1mm）",
+                        "状态报告：生成装卸完成报告，上传指挥端"
+                    ],
+                    "knowledge_trace": "位置验证 → 稳定性检查 → 状态报告生成 → 上传确认。"
+                },
+                "deployment_confirmation": {
+                    "title": "投放确认",
+                    "summary": "通过视觉、位姿与通信回传自动确认投放结果，判定成功与否。",
+                    "key_points": [
+                        "结果感知：采集投放后图像、姿态、设备回传信号",
+                        "落点偏差：比较实际与目标坐标，水平偏差<10cm判定合格",
+                        "功能检查：验证通电状态、通信链路、传感器自检",
+                        "成功判定：综合评估，输出成功/失败/需重投结论"
+                    ],
+                    "knowledge_trace": "结果感知 → 落点偏差分析 → 功能状态检查 → 投放成功判定。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            {"id": "result_perc", "label": "结果感知", "type": "input"},
+                            {"id": "image", "label": "投放后图像", "type": "input"},
+                            {"id": "pose", "label": "姿态信息", "type": "input"},
+                            {"id": "signal", "label": "设备回传信号", "type": "input"},
+                            {"id": "deviation", "label": "落点偏差分析", "type": "process"},
+                            {"id": "func_check", "label": "功能状态检查", "type": "process"},
+                            {"id": "power", "label": "通电状态", "type": "process"},
+                            {"id": "comm", "label": "通信链路", "type": "process"},
+                            {"id": "self_test", "label": "传感器自检", "type": "process"},
+                            {"id": "judgment", "label": "投放成功判定", "type": "output"}
+                        ],
+                        "edges": [
+                            {"source": "image", "target": "result_perc"},
+                            {"source": "pose", "target": "result_perc"},
+                            {"source": "signal", "target": "result_perc"},
+                            {"source": "result_perc", "target": "deviation"},
+                            {"source": "deviation", "target": "func_check"},
+                            {"source": "power", "target": "func_check"},
+                            {"source": "comm", "target": "func_check"},
+                            {"source": "self_test", "target": "func_check"},
+                            {"source": "func_check", "target": "judgment"}
+                        ]
+                    }
+                },
+                "result_perception": {
+                    "title": "结果感知",
+                    "summary": "采集投放后的设备状态信息，为投放确认提供数据支撑。",
+                    "key_points": [
+                        "图像采集：机器狗高清摄像头拍摄全景与特写图像",
+                        "姿态测量：视觉+激光雷达测量设备当前位置与方向",
+                        "信号检测：检测设备心跳信号（每5秒），确认设备激活"
+                    ],
+                    "knowledge_trace": "图像采集 + 姿态测量 + 信号检测 → 形成结果感知数据集。"
+                },
+                "landing_deviation_analysis": {
+                    "title": "落点偏差分析",
+                    "summary": "比较实际放置坐标与目标坐标，计算并评估偏差。",
+                    "key_points": [
+                        "实际坐标：RTK-GPS+视觉融合测量，精度±5cm",
+                        "偏差计算：水平偏差3.2cm（<10cm✓），航向偏差1.5°（<5°✓）",
+                        "评估结论：落点偏差满足精度要求"
+                    ],
+                    "knowledge_trace": "实际坐标测量 → 目标坐标比对 → 偏差计算 → 精度评估。"
+                },
+                "function_status_check": {
+                    "title": "功能状态检查",
+                    "summary": "检查设备通电、通信与传感器工作状态，验证功能完整性。",
+                    "key_points": [
+                        "通电状态：电源指示灯绿色常亮，电量>90%，电压12.1V正常",
+                        "通信链路：4G信号-72dBm，心跳包正常，延迟<200ms",
+                        "传感器自检：所有传感器工作正常，自检通过"
+                    ],
+                    "knowledge_trace": "通电检测 → 通信验证 → 传感器自检 → 功能状态汇总。"
+                },
+                "deployment_success_judgment": {
+                    "title": "投放成功判定",
+                    "summary": "综合各项指标，判定投放结果为成功、失败或需重投。",
+                    "key_points": [
+                        "判定标准：位置偏差<10cm、航向偏差<5°、通电正常、通信正常、传感器自检通过",
+                        "本次结果：所有标准均满足，判定为【成功】",
+                        "重投策略：若失败，分析原因→调整参数→切换备用点→重新投放"
+                    ],
+                    "knowledge_trace": "各项指标评估 → 标准比对 → 最终判定 → 结果上报/重投决策。"
                 }
             }
         },

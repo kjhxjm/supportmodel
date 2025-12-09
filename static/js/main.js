@@ -695,6 +695,7 @@ function renderInsightGraph(graphData) {
             width: container.offsetWidth - 10,
             height: container.offsetHeight - 10,
             linkCenter: true,
+            // 默认模式，可以拖动、缩放、拖动节点
             modes: {
                 default: ['drag-canvas', 'zoom-canvas', 'drag-node'],
             },
@@ -720,8 +721,13 @@ function renderInsightGraph(graphData) {
                 }
             },
             layout: {
+                // type 决定了知识图谱子图的自动排列方式。例如:
+                // 'force' 表示采用力导向布局（节点间有弹簧/斥力，适合复杂关系分布），
+                // 'dagre' 则为有向无环图（层次）布局（适合线性链式结构，自上而下/自左而右排列）。
+                // 这里默认采用 force，更适合非线性结构的知识图谱展示。
                 type: 'force',
-                linkDistance: 120,  // 边长度 - 适当减小让布局更紧凑
+                // type: 'dagre',
+                linkDistance: 110,  // 边长度 - 适当减小让布局更紧凑
                 nodeStrength: 10, // 节点排斥力 - 减小让布局更快稳定
                 edgeStrength: 0.6,  // 边吸引力 - 增强让节点更快就位
                 preventOverlap: true, // 防止重叠
