@@ -42,24 +42,32 @@ SCENARIOS: List[Scenario] = [
         example_output={
             "default_focus": "deployment_strategy",
             "behavior_tree": {
-                "id": "task_analysis",
-                "label": "📦 任务解析：设备投放部署任务",
-                "status": "completed",
-                "summary": "解析从(85,20)向前沿区域X(210,145)投放设备资源Y共2套的任务，区域周边地形复杂且存在环境干扰风险，要求30分钟内完成部署。运输距离约156km，需考虑设备安全与精确投放。",
+                "id": "deployment_strategy",
+                "label": "🎯 设备投放策略",
+                "status": "active",
+                "summary": "生成包含任务解析、投放方式匹配、投放位置优化、风险规避与投放确认的完整投放策略，确保设备资源Y能够安全、准确、高效地投放至前沿区域X(210,145)。",
                 "children": [
                     {
-                        "id": "equipment_matching",
-                        "label": "🚗 设备匹配：2辆六轮越野无人车+1只机器狗",
+                        "id": "task_analysis",
+                        "label": "📦 任务解析",
                         "status": "completed",
-                        "summary": "基于156km运输距离、30分钟时限与复杂地形，选择2辆六轮越野无人车（各载1套设备Y）+1只机器狗（用于抵近侦察与精确定位），理由：六轮设计具备良好通过性与稳定性，机器狗适应复杂地形进行目标定位。",
-                        "children": []
-                    },
-                    {
-                        "id": "quantity_inference",
-                        "label": "🔢 数量推断：2辆无人车+1只机器狗",
-                        "status": "completed",
-                        "summary": "设备资源Y单套重量约30kg，单车载重能力80kg，考虑运输安全余量（载重利用率70%），每车携带1套设备Y。增加1辆备用车应对故障，配置1只机器狗用于精确定位与辅助作业。最终编组：3辆六轮越野无人车（2主1备）+1只机器狗。",
-                        "children": []
+                        "summary": "解析从(85,20)向前沿区域X(210,145)投放设备资源Y共2套的任务，识别设备类型、重量体积、功能、生存性要求、投放精度需求与环境风险。",
+                        "children": [
+                            {
+                                "id": "equipment_matching",
+                                "label": "🚗 设备匹配：2辆六轮越野无人车+1只机器狗",
+                                "status": "completed",
+                                "summary": "基于156km运输距离、30分钟时限与复杂地形，选择2辆六轮越野无人车（各载1套设备Y）+1只机器狗（用于抵近侦察与精确定位），理由：六轮设计具备良好通过性与稳定性，机器狗适应复杂地形进行目标定位。",
+                                "children": []
+                            },
+                            {
+                                "id": "quantity_inference",
+                                "label": "🔢 数量推断：2辆无人车+1只机器狗",
+                                "status": "completed",
+                                "summary": "设备资源Y单套重量约30kg，单车载重能力80kg，考虑运输安全余量（载重利用率70%），每车携带1套设备Y。增加1辆备用车应对故障，配置1只机器狗用于精确定位与辅助作业。最终编组：3辆六轮越野无人车（2主1备）+1只机器狗。",
+                                "children": []
+                            }
+                        ]
                     },
                     {
                         "id": "delivery_method_matching",
@@ -76,10 +84,10 @@ SCENARIOS: List[Scenario] = [
                         "children": []
                     },
                     {
-                        "id": "deployment_strategy",
-                        "label": "🎯 设备投放策略",
-                        "status": "active",
-                        "summary": "生成包含目标定位、投放位置优化与风险规避的完整投放策略，确保设备资源Y能够安全、准确、高效地投放至前沿区域X(210,145)。",
+                        "id": "position_optimization",
+                        "label": "📐 投放位置优化",
+                        "status": "completed",
+                        "summary": "通过目标定位、地形分析与信号覆盖评估，优化最终投放点位置，确保设备部署后功能正常。",
                         "children": [
                             {
                                 "id": "target_localization",
@@ -191,62 +199,54 @@ SCENARIOS: List[Scenario] = [
                                 ]
                             },
                             {
-                                "id": "position_optimization",
-                                "label": "📐 投放位置优化",
+                                "id": "terrain_suitability",
+                                "label": "🏔️ 地形适宜性评估",
                                 "status": "completed",
-                                "summary": "基于地形分析、目标定位结果与信号覆盖评估，优化最终投放点位置，确保设备部署后功能正常。",
-                                "children": [
-                                    {
-                                        "id": "terrain_suitability",
-                                        "label": "🏔️ 地形适宜性评估",
-                                        "status": "completed",
-                                        "summary": "评估候选投放点的地面平整度（坡度<5°）、承载能力（>100kg/m²）、排水条件，选择最优投放位置。",
-                                        "children": []
-                                    },
-                                    {
-                                        "id": "signal_coverage",
-                                        "label": "📶 信号覆盖评估",
-                                        "status": "completed",
-                                        "summary": "检测投放点的通信信号强度（4G/5G信号>-85dBm）、GPS信号质量（HDOP<2.0），确保设备部署后通信正常。",
-                                        "children": []
-                                    },
-                                    {
-                                        "id": "final_position",
-                                        "label": "✅ 最终位置确定",
-                                        "status": "completed",
-                                        "summary": "综合地形、信号与安全因素，确定最终投放点坐标(210.05, 145.02)，偏离初始目标0.07m，满足投放精度要求。",
-                                        "children": []
-                                    }
-                                ]
+                                "summary": "评估候选投放点的地面平整度（坡度<5°）、承载能力（>100kg/m²）、排水条件，选择最优投放位置。",
+                                "children": []
                             },
                             {
-                                "id": "risk_avoidance",
-                                "label": "⚠️ 风险规避策略",
+                                "id": "signal_coverage",
+                                "label": "📶 信号覆盖评估",
                                 "status": "completed",
-                                "summary": "制定包含低可探测路径选择、威胁区域规避与备用投放点设置的多层次风险规避方案。",
-                                "children": [
-                                    {
-                                        "id": "low_detectability_path",
-                                        "label": "🛤️ 低可探测路径",
-                                        "status": "completed",
-                                        "summary": "规划利用地形遮蔽的行进路径，优先选择山脊背面、树林边缘等低可探测区域，降低被发现概率。",
-                                        "children": []
-                                    },
-                                    {
-                                        "id": "threat_zone_bypass",
-                                        "label": "🚫 威胁区域规避",
-                                        "status": "completed",
-                                        "summary": "标注环境干扰风险区域（电磁干扰区、不稳定地形区），规划绕行路径，安全距离>50m。",
-                                        "children": []
-                                    },
-                                    {
-                                        "id": "backup_deployment_point",
-                                        "label": "📍 备用投放点设置",
-                                        "status": "completed",
-                                        "summary": "预设2个备用投放点（距主投放点100m和200m），当主投放点不可用时自动切换，切换决策时间<30秒。",
-                                        "children": []
-                                    }
-                                ]
+                                "summary": "检测投放点的通信信号强度（4G/5G信号>-85dBm）、GPS信号质量（HDOP<2.0），确保设备部署后通信正常。",
+                                "children": []
+                            },
+                            {
+                                "id": "final_position",
+                                "label": "✅ 最终位置确定",
+                                "status": "completed",
+                                "summary": "综合地形、信号与安全因素，确定最终投放点坐标(210.05, 145.02)，偏离初始目标0.07m，满足投放精度要求。",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "id": "risk_avoidance",
+                        "label": "⚠️ 风险规避策略",
+                        "status": "completed",
+                        "summary": "制定包含低可探测路径选择、威胁区域规避与备用投放点设置的多层次风险规避方案。",
+                        "children": [
+                            {
+                                "id": "low_detectability_path",
+                                "label": "🛤️ 低可探测路径",
+                                "status": "completed",
+                                "summary": "规划利用地形遮蔽的行进路径，优先选择山脊背面、树林边缘等低可探测区域，降低被发现概率。",
+                                "children": []
+                            },
+                            {
+                                "id": "threat_zone_bypass",
+                                "label": "🚫 威胁区域规避",
+                                "status": "completed",
+                                "summary": "标注环境干扰风险区域（电磁干扰区、不稳定地形区），规划绕行路径，安全距离>50m。",
+                                "children": []
+                            },
+                            {
+                                "id": "backup_deployment_point",
+                                "label": "📍 备用投放点设置",
+                                "status": "completed",
+                                "summary": "预设2个备用投放点（距主投放点100m和200m），当主投放点不可用时自动切换，切换决策时间<30秒。",
+                                "children": []
                             }
                         ]
                     },
@@ -1511,6 +1511,151 @@ SCENARIOS: List[Scenario] = [
                             {"source": "risk_level", "target": "emergency_strategy"},
                             {"source": "emergency_strategy",
                                 "target": "execution_result"}
+                        ]
+                    }
+                }
+            }
+        },
+    ),
+    Scenario(
+        id="equipment_task_formation",  # 任务编组
+        model_name="设备投放",
+        name="任务编组",
+        example_input="（85,20）向前沿区域X（210,145）投放设备资源Y，在确保安全的前提下完成部署，给出对应的任务编组。",
+        reasoning_chain="任务解析（物资类型、重量与体积、投放精度需求、环境风险）→ 设备匹配（匹配适用的无人车类型）→ 数量推断（根据载荷能力与冗余策略推算所需设备数量）→ 投放方式生成（决定投放方式）",
+        prompt=(
+            "【设备投放-任务编组专项要求】\n"
+            "1. 行为树必须至少包含以下核心节点，严格按照推理链条自上而下展开：\n"
+            "   - task_analysis（任务解析）：解析物资类型（设备资源Y）、重量与体积、投放精度需求、环境风险；\n"
+            "   - equipment_matching（设备匹配）：匹配适用的无人车类型（机器狗/六轮越野无人车），说明选择理由；\n"
+            "   - quantity_inference（数量推断）：根据载荷能力与冗余策略推算所需设备数量；\n"
+            "   - delivery_method_generation（投放方式生成）：决定投放方式（地面配送、自主装卸、协同投放）；\n"
+            "   - formation_summary（编组节点汇总，核心节点）：汇总编组方案，必须包含 knowledge_graph 字段。\n"
+            "2. formation_summary 节点的 knowledge_graph 必须体现：任务解析 → 设备匹配 → 数量推断 → 投放方式生成 → 编组方案输出。\n"
+            "3. knowledge_graph 中必须包含至少8个节点，包括主推理链节点和辅助细节节点（如地形数据、设备库存状态、任务优先级、气象条件等）。\n"
+            "4. 在 node_insights 中，所有节点的 knowledge_trace 必须体现完整推理路径。"
+        ),
+        example_output={
+            "default_focus": "formation_summary",
+            "behavior_tree": {
+                "id": "task_analysis",
+                "label": "📦 任务解析：投放任务编组",
+                "status": "completed",
+                "summary": "解析从(85,20)向前沿区域X(210,145)投放设备资源Y的任务，明确物资类型、重量体积、投放精度需求与环境风险。",
+                "children": [
+                    {
+                        "id": "equipment_matching",
+                        "label": "🚗 设备匹配：六轮越野无人车+机器狗",
+                        "status": "completed",
+                        "summary": "基于运输距离约156km、地形复杂度与设备特性，选择2辆六轮越野无人车（主力运输）+1只机器狗（精确定位辅助）。",
+                        "children": []
+                    },
+                    {
+                        "id": "quantity_inference",
+                        "label": "🔢 数量推断：2辆无人车+1只机器狗",
+                        "status": "completed",
+                        "summary": "设备资源Y单套重量约30kg，单车载重能力80kg，考虑安全余量（载重利用率70%），每车携带1套设备。配置1只机器狗用于精确定位。",
+                        "children": []
+                    },
+                    {
+                        "id": "delivery_method_generation",
+                        "label": "📍 投放方式生成：地面配送+自主装卸",
+                        "status": "completed",
+                        "summary": "基于平整地面环境与精度要求，选择地面配送+自主装卸方式。无人车到达投放点后，通过车载机械臂自主完成设备卸载。",
+                        "children": []
+                    },
+                    {
+                        "id": "formation_summary",
+                        "label": "✅ 编组节点汇总",
+                        "status": "active",
+                        "summary": "形成由2辆六轮越野无人车（主力运输）+1只机器狗（定位辅助）构成的投放编组，明确各自职责与协同方式。",
+                        "children": []
+                    }
+                ]
+            },
+            "node_insights": {
+                "task_analysis": {
+                    "title": "任务解析",
+                    "summary": "从任务文本中提取起点(85,20)、目标区域X(210,145)、设备资源Y等关键要素，为编组决策提供输入。",
+                    "key_points": [
+                        "起点坐标(85,20)，目标区域X坐标(210,145)，直线距离约156km",
+                        "设备资源Y需要投放，需确定具体数量、重量与体积特性",
+                        "安全要求：在确保安全的前提下完成部署",
+                        "为后续设备匹配与数量推断提供约束条件"
+                    ],
+                    "knowledge_trace": "任务文本 → 坐标/距离/设备/安全要素提取 → 形成任务约束条件 → 为编组决策提供输入。"
+                },
+                "equipment_matching": {
+                    "title": "设备匹配",
+                    "summary": "基于任务距离、地形特点与设备特性，选择适用的无人车类型与辅助设备。",
+                    "key_points": [
+                        "运输距离156km，需选择续航能力强的无人车平台",
+                        "六轮越野无人车：最高时速60km/h，续航150km，载重80kg，适合长距离运输",
+                        "机器狗：四足行走适应复杂地形，搭载高精度传感器用于目标定位",
+                        "选择理由：六轮设计提供稳定运输能力，机器狗实现精确定位"
+                    ],
+                    "knowledge_trace": "运输距离+地形约束 → 平台能力分析 → 选择六轮越野无人车（运输）+ 机器狗（定位）组合。"
+                },
+                "quantity_inference": {
+                    "title": "数量推断",
+                    "summary": "依据设备重量体积与单车载荷，叠加冗余策略，推算所需无人车与机器狗数量。",
+                    "key_points": [
+                        "设备资源Y假设单套重量约30kg，体积40×30×25cm",
+                        "单车有效载荷：80kg×70%=56kg（考虑安全余量）",
+                        "运输需求：假设需要2套设备（共60kg），需2辆无人车（各携带1套）",
+                        "配置1只机器狗用于精确定位与辅助作业"
+                    ],
+                    "knowledge_trace": "设备总载荷计算 → 单车有效载荷评估 → 理论数量计算 → 冗余策略叠加 → 最终编组数量。"
+                },
+                "delivery_method_generation": {
+                    "title": "投放方式生成",
+                    "summary": "在平整地面投放环境下，生成地面配送+自主装卸的投放方式。",
+                    "key_points": [
+                        "地面配送：无人车直接将设备运输至投放点附近",
+                        "自主装卸：车载机械臂自主完成设备卸载与精确放置",
+                        "协同投放：机器狗提供精确定位引导，无人车执行放置动作",
+                        "选择理由：平整地面条件良好，自主装卸可实现高精度投放"
+                    ],
+                    "knowledge_trace": "环境条件评估 → 候选投放方式分析 → 精度需求匹配 → 生成投放方式决策。"
+                },
+                "formation_summary": {
+                    "title": "编组节点汇总",
+                    "summary": "将任务解析、设备匹配、数量推断和投放方式的结论汇总为可执行的编组方案。",
+                    "key_points": [
+                        "编组构成：2辆六轮越野无人车（主力运输）+1只机器狗（定位辅助）",
+                        "任务分工：无人车负责设备运输与自主装卸，机器狗负责精确定位与引导",
+                        "协同方式：机器狗先行进行目标定位→无人车到位→自主装卸→投放确认",
+                        "输出：完整的投放编组方案，包含设备类型、数量与协同策略"
+                    ],
+                    "knowledge_trace": "任务要素 → 设备匹配 → 数量与方式推断 → 汇总为编组方案。",
+                    "knowledge_graph": {
+                        "nodes": [
+                            # 主推理链节点（5个）
+                            {"id": "task_parsing", "label": "任务解析", "type": "input"},
+                            {"id": "equipment_matching", "label": "设备匹配", "type": "process"},
+                            {"id": "quantity_inference", "label": "数量推断", "type": "process"},
+                            {"id": "delivery_method", "label": "投放方式生成", "type": "decision"},
+                            {"id": "formation_output", "label": "编组方案输出", "type": "output"},
+                            
+                            # 辅助细节节点（4个）
+                            {"id": "terrain_data", "label": "地形数据", "type": "input"},
+                            {"id": "equipment_inventory", "label": "设备库存状态", "type": "input"},
+                            {"id": "mission_priority", "label": "任务优先级", "type": "input"},
+                            {"id": "weather_condition", "label": "气象条件", "type": "input"}
+                        ],
+                        "edges": [
+                            # 主推理链连接
+                            {"source": "task_parsing", "target": "equipment_matching"},
+                            {"source": "equipment_matching", "target": "quantity_inference"},
+                            {"source": "quantity_inference", "target": "delivery_method"},
+                            {"source": "delivery_method", "target": "formation_output"},
+                            
+                            # 辅助节点的单向连接
+                            {"source": "terrain_data", "target": "equipment_matching"},
+                            {"source": "equipment_inventory", "target": "quantity_inference"},
+                            {"source": "weather_condition", "target": "delivery_method"}
+                            
+                            # 注意：mission_priority 独立存在，不连接到主链
                         ]
                     }
                 }

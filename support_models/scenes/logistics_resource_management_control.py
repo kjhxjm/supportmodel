@@ -257,30 +257,33 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "物资属性与仓储区域 → 剩余容量计算 → 频次与同类物资位置分析 → 形成仓位推荐方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "material_parsing",
-                                "label": "物资属性解析", "type": "input"},
-                            {"id": "warehouse_matching",
-                                "label": "仓储类型匹配", "type": "process"},
-                            {"id": "capacity_analysis",
-                                "label": "容量分析", "type": "process"},
-                            {"id": "frequency_analysis",
-                                "label": "频次分析", "type": "process"},
-                            {"id": "location_matching",
-                                "label": "位置匹配", "type": "process"},
-                            {"id": "position_recommendation",
-                                "label": "仓位推荐", "type": "output"}
+                            # 主推理链节点
+                            {"id": "material_parsing", "label": "物资属性解析", "type": "input"},
+                            {"id": "warehouse_matching", "label": "仓储类型匹配", "type": "process"},
+                            {"id": "capacity_analysis", "label": "容量分析", "type": "process"},
+                            {"id": "frequency_analysis", "label": "频次分析", "type": "decision"},
+                            {"id": "location_matching", "label": "位置匹配", "type": "process"},
+                            {"id": "position_recommendation", "label": "仓位推荐", "type": "output"},
+                            
+                            # 辅助细节节点（与任务相关但相关性较低）
+                            {"id": "temperature_monitor", "label": "温度监控数据", "type": "input"},
+                            {"id": "humidity_monitor", "label": "湿度监控数据", "type": "input"},
+                            {"id": "access_route", "label": "通道可达性", "type": "input"},
+                            {"id": "shelf_structure", "label": "货架结构信息", "type": "input"}
                         ],
                         "edges": [
-                            {"source": "material_parsing",
-                                "target": "warehouse_matching"},
-                            {"source": "warehouse_matching",
-                                "target": "capacity_analysis"},
-                            {"source": "capacity_analysis",
-                                "target": "frequency_analysis"},
-                            {"source": "frequency_analysis",
-                                "target": "location_matching"},
-                            {"source": "location_matching",
-                                "target": "position_recommendation"}
+                            # 主推理链连接
+                            {"source": "material_parsing", "target": "warehouse_matching"},
+                            {"source": "warehouse_matching", "target": "capacity_analysis"},
+                            {"source": "capacity_analysis", "target": "frequency_analysis"},
+                            {"source": "frequency_analysis", "target": "location_matching"},
+                            {"source": "location_matching", "target": "position_recommendation"},
+                            
+                            # 辅助节点的单向连接
+                            {"source": "temperature_monitor", "target": "warehouse_matching"},
+                            {"source": "humidity_monitor", "target": "warehouse_matching"}
+                            
+                            # 注意：access_route、shelf_structure 独立存在，不连接到主链
                         ]
                     }
                 },
@@ -584,34 +587,33 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "库存数据对比 → 短缺检测 → 过期检测 → 误放检测 → 差异汇总。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "inventory_parsing",
-                                "label": "库存数据解析", "type": "input"},
-                            {"id": "strategy_formulation",
-                                "label": "盘点策略制定", "type": "process"},
-                            {"id": "shortage_detection",
-                                "label": "短缺检测", "type": "process"},
-                            {"id": "expiry_detection",
-                                "label": "过期检测", "type": "process"},
-                            {"id": "misplacement_detection",
-                                "label": "误放检测", "type": "process"},
-                            {"id": "difference_summary",
-                                "label": "差异汇总", "type": "output"}
+                            # 主推理链节点
+                            {"id": "inventory_parsing", "label": "库存数据解析", "type": "input"},
+                            {"id": "strategy_formulation", "label": "盘点策略制定", "type": "process"},
+                            {"id": "shortage_detection", "label": "短缺检测", "type": "process"},
+                            {"id": "expiry_detection", "label": "过期检测", "type": "process"},
+                            {"id": "misplacement_detection", "label": "误放检测", "type": "process"},
+                            {"id": "difference_summary", "label": "差异汇总", "type": "output"},
+                            
+                            # 辅助细节节点（与任务相关但相关性较低）
+                            {"id": "historical_inventory", "label": "历史盘点记录", "type": "input"},
+                            {"id": "consumption_rate", "label": "消耗速率数据", "type": "input"},
+                            {"id": "weather_impact", "label": "环境条件影响", "type": "input"}
                         ],
                         "edges": [
-                            {"source": "inventory_parsing",
-                                "target": "strategy_formulation"},
-                            {"source": "strategy_formulation",
-                                "target": "shortage_detection"},
-                            {"source": "strategy_formulation",
-                                "target": "expiry_detection"},
-                            {"source": "strategy_formulation",
-                                "target": "misplacement_detection"},
-                            {"source": "shortage_detection",
-                                "target": "difference_summary"},
-                            {"source": "expiry_detection",
-                                "target": "difference_summary"},
-                            {"source": "misplacement_detection",
-                                "target": "difference_summary"}
+                            # 主推理链连接
+                            {"source": "inventory_parsing", "target": "strategy_formulation"},
+                            {"source": "strategy_formulation", "target": "shortage_detection"},
+                            {"source": "strategy_formulation", "target": "expiry_detection"},
+                            {"source": "strategy_formulation", "target": "misplacement_detection"},
+                            {"source": "shortage_detection", "target": "difference_summary"},
+                            {"source": "expiry_detection", "target": "difference_summary"},
+                            {"source": "misplacement_detection", "target": "difference_summary"},
+                            
+                            # 辅助节点的单向连接
+                            {"source": "historical_inventory", "target": "strategy_formulation"}
+                            
+                            # 注意：consumption_rate、weather_impact 独立存在
                         ]
                     }
                 },
@@ -870,26 +872,30 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "需求清单 → 库存批次 → 保质期与FIFO排序 → 批次锁定并生成出库方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "requirement_parsing",
-                                "label": "任务需求解析(急救包10,绷带20,注射器40)", "type": "input"},
-                            {"id": "inventory_matching",
-                                "label": "库存匹配(急救包12,绷带30,注射器80)", "type": "process"},
-                            {"id": "strategy_selection",
-                                "label": "出库策略选择(保质期优先+FIFO)", "type": "decision"},
-                            {"id": "batch_determination",
-                                "label": "批次确定(A5,B5,C20,D40)", "type": "process"},
-                            {"id": "outbound_plan",
-                                "label": "出库方案生成(70件,1小时内交付)", "type": "output"}
+                            # 主推理链节点
+                            {"id": "requirement_parsing", "label": "任务需求解析", "type": "input"},
+                            {"id": "inventory_matching", "label": "库存匹配", "type": "process"},
+                            {"id": "strategy_selection", "label": "出库策略选择", "type": "decision"},
+                            {"id": "batch_determination", "label": "批次确定", "type": "process"},
+                            {"id": "outbound_plan", "label": "出库方案生成", "type": "output"},
+                            
+                            # 辅助细节节点（与任务相关但相关性较低）
+                            {"id": "historical_usage", "label": "历史出库记录", "type": "input"},
+                            {"id": "batch_quality", "label": "批次质量检验", "type": "input"},
+                            {"id": "transport_capacity", "label": "运输能力评估", "type": "input"},
+                            {"id": "urgency_level", "label": "任务紧急度", "type": "input"}
                         ],
                         "edges": [
-                            {"source": "requirement_parsing",
-                                "target": "inventory_matching"},
-                            {"source": "inventory_matching",
-                                "target": "strategy_selection"},
-                            {"source": "strategy_selection",
-                                "target": "batch_determination"},
-                            {"source": "batch_determination",
-                                "target": "outbound_plan"}
+                            # 主推理链连接
+                            {"source": "requirement_parsing", "target": "inventory_matching"},
+                            {"source": "inventory_matching", "target": "strategy_selection"},
+                            {"source": "strategy_selection", "target": "batch_determination"},
+                            {"source": "batch_determination", "target": "outbound_plan"},
+                            
+                            # 辅助节点的单向连接
+                            {"source": "urgency_level", "target": "strategy_selection"}
+                            
+                            # 注意：historical_usage、batch_quality、transport_capacity 独立存在
                         ]
                     }
                 },
@@ -1143,30 +1149,33 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "状态与需求 → 优先级排序 → 备份与替换准备 → 排期落表 → 输出维护方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "status_parsing",
-                                "label": "资源状态解析(电池500h/70%,设备800h)", "type": "input"},
-                            {"id": "requirement_judgment",
-                                "label": "维护需求判断(检测/校准/检查)", "type": "process"},
-                            {"id": "priority_sorting",
-                                "label": "优先级排序(电池检测>设备校准)", "type": "decision"},
-                            {"id": "replacement_plan",
-                                "label": "资源替换方案(备用电池2,设备1)", "type": "process"},
-                            {"id": "schedule_arrangement",
-                                "label": "调度安排(48h内完成)", "type": "process"},
-                            {"id": "maintenance_plan",
-                                "label": "维护方案生成(含复检与记录)", "type": "output"}
+                            # 主推理链节点
+                            {"id": "status_parsing", "label": "资源状态解析", "type": "input"},
+                            {"id": "requirement_judgment", "label": "维护需求判断", "type": "process"},
+                            {"id": "priority_sorting", "label": "优先级排序", "type": "decision"},
+                            {"id": "replacement_plan", "label": "资源替换方案", "type": "process"},
+                            {"id": "schedule_arrangement", "label": "调度安排", "type": "process"},
+                            {"id": "maintenance_plan", "label": "维护方案生成", "type": "output"},
+                            
+                            # 辅助细节节点（与任务相关但相关性较低）
+                            {"id": "historical_maintenance", "label": "历史维护记录", "type": "input"},
+                            {"id": "spare_parts_inventory", "label": "备件库存状态", "type": "input"},
+                            {"id": "technician_schedule", "label": "技术人员排班", "type": "input"},
+                            {"id": "equipment_downtime", "label": "停机时间成本", "type": "input"}
                         ],
                         "edges": [
-                            {"source": "status_parsing",
-                                "target": "requirement_judgment"},
-                            {"source": "requirement_judgment",
-                                "target": "priority_sorting"},
-                            {"source": "priority_sorting",
-                                "target": "replacement_plan"},
-                            {"source": "replacement_plan",
-                                "target": "schedule_arrangement"},
-                            {"source": "schedule_arrangement",
-                                "target": "maintenance_plan"}
+                            # 主推理链连接
+                            {"source": "status_parsing", "target": "requirement_judgment"},
+                            {"source": "requirement_judgment", "target": "priority_sorting"},
+                            {"source": "priority_sorting", "target": "replacement_plan"},
+                            {"source": "replacement_plan", "target": "schedule_arrangement"},
+                            {"source": "schedule_arrangement", "target": "maintenance_plan"},
+                            
+                            # 辅助节点的单向连接
+                            {"source": "historical_maintenance", "target": "requirement_judgment"},
+                            {"source": "spare_parts_inventory", "target": "replacement_plan"}
+                            
+                            # 注意：technician_schedule、equipment_downtime 独立存在
                         ]
                     }
                 },

@@ -7,51 +7,54 @@ SCENARIOS: List[Scenario] = [
         id="casualty_team_formation",  # 9. 任务编组
         model_name="伤员救助",
         name="任务编组",
-        example_input="在X区域发现两名伤员，需要无人救援设备前往救助并运回安全点",
-        reasoning_chain="任务解析（伤员数量、地形环境、救助紧急度）→ 设备类型匹配（医疗无人机、担架无人车或机器人）→ 数量计算（根据伤员人数与运载能力推算设备数量）→ 救援方式规划（空投急救包/无人机抵近观察/无人车运送）",
+        example_input="在区域X（210,145）发现伤员，需调派无人救援设备前往实施救助，并将伤员运回安全点，给出对应的任务编组。",
+        reasoning_chain="任务解析（伤员数量、地形环境、救助紧急度）→ 设备类型匹配（选择医疗无人机、担架无人车或机器人，理由：具备生命体征监测与搬运能力）→ 数量计算（根据伤员人数与运载能力推算救援设备数量）→ 救援方式规划（空投急救包/无人机抵近观察/无人车运送）",
         prompt=(
             "【伤员救助-任务编组专项要求】\n"
-            "1. 行为树必须包含：task_analysis（解析伤员数量、地形环境、救助紧急度）→ "
-            "equipment_matching（匹配医疗无人机、担架无人车或机器人）→ "
-            "quantity_calculation（根据伤员人数与运载能力推算设备数量）→ "
-            "rescue_planning（规划空投急救包/无人机抵近观察/无人车运送）→ "
-            "team_formation（编组结果，包含 knowledge_graph）。\n"
-            "2. team_formation 的 knowledge_graph 应体现：任务解析 → 设备匹配 → 数量计算 → 救援方式 → 编组方案。"
+            "1. 行为树必须至少包含以下核心节点，严格按照推理链条自上而下展开：\n"
+            "   - task_analysis（任务解析）：解析伤员数量、区域X（210,145）地形环境、救助紧急度；\n"
+            "   - equipment_matching（设备类型匹配）：选择医疗无人机、担架无人车或机器人，理由：具备生命体征监测与搬运能力；\n"
+            "   - quantity_calculation（数量计算）：根据伤员人数与运载能力推算救援设备数量；\n"
+            "   - rescue_planning（救援方式规划）：规划空投急救包/无人机抵近观察/无人车运送；\n"
+            "   - team_formation（救助编组，核心节点）：汇总编组方案，必须包含 knowledge_graph 字段。\n"
+            "2. team_formation 节点的 knowledge_graph 必须体现：任务解析 → 设备类型匹配 → 数量计算 → 救援方式规划 → 编组方案输出。\n"
+            "3. knowledge_graph 中必须包含至少8个节点，包括主推理链节点和辅助细节节点（如伤情评估、路径规划、医疗资源配置等）。\n"
+            "4. 在 node_insights 中，所有节点的 knowledge_trace 必须体现完整推理路径。"
         ),
         example_output={
             "default_focus": "team_formation",
             "behavior_tree": {
                 "id": "task_analysis",
-                "label": "🆘 任务解析：X区域两名伤员救助与转运",
+                "label": "🆘 任务解析：区域X（210,145）伤员救助编组",
                 "status": "completed",
-                "summary": "解析在X区域发现两名伤员的环境、紧急程度与可达性，为选择救援设备与路径提供约束。",
+                "summary": "解析在区域X（210,145）发现伤员的环境、紧急程度与可达性，为选择救援设备与路径提供约束。",
                 "children": [
                     {
                         "id": "equipment_matching",
-                        "label": "设备类型匹配",
+                        "label": "🚁 设备类型匹配：医疗无人机+担架无人车",
                         "status": "completed",
-                        "summary": "根据地形与伤情选择医疗无人机、担架无人车或救援机器人等组合。",
+                        "summary": "选择医疗无人机与担架无人车组合，理由：具备生命体征监测与搬运能力，适合伤员救助场景。",
                         "children": []
                     },
                     {
                         "id": "quantity_calculation",
-                        "label": "数量计算",
+                        "label": "🔢 数量计算：1架无人机+2台担架车",
                         "status": "completed",
-                        "summary": "依据伤员数量、各类设备运载能力与冗余要求推算所需平台数量。",
+                        "summary": "依据伤员数量、各类设备运载能力与冗余要求推算所需平台数量：1架医疗无人机+2台担架无人车。",
                         "children": []
                     },
                     {
                         "id": "rescue_planning",
-                        "label": "救援方式规划",
+                        "label": "📋 救援方式规划：侦察+急救+转运",
                         "status": "completed",
-                        "summary": "综合任务紧急度与地形条件，规划空投急救包、无人机抵近观察和无人车转运的组合方式。",
+                        "summary": "综合任务紧急度与地形条件，规划无人机抵近观察→空投急救包→担架无人车转运的组合方式。",
                         "children": []
                     },
                     {
                         "id": "team_formation",
-                        "label": "✅ 救助编组结果",
+                        "label": "✅ 救助编组",
                         "status": "active",
-                        "summary": "给出由医疗无人机与担架无人车构成的协同救援编组方案。",
+                        "summary": "给出由1架医疗无人机与2台担架无人车构成的协同救援编组方案。",
                         "children": []
                     }
                 ]
@@ -59,69 +62,86 @@ SCENARIOS: List[Scenario] = [
             "node_insights": {
                 "task_analysis": {
                     "title": "任务解析",
-                    "summary": "将“两名伤员、X区域、需前往救助并运回安全点”的文本拆解为救援规模、时间压力和地形风险等关键要素。",
+                    "summary": "将\"区域X(210,145)发现伤员、需前往救助并运回安全点\"的文本拆解为救援规模、时间压力和地形风险等关键要素。",
                     "key_points": [
+                        "区域坐标：X区域位于(210,145)，需确定起点到目标的距离与可达路径",
                         "识别伤员数量与可能分布位置，决定是否需要多点同时接入",
-                        "评估X区域地形（山地、废墟、浅水等）对设备通行能力的影响",
-                        "根据“发现伤员”到“必须撤离”的时间窗口评估救助紧急度"
+                        "评估X区域地形(山地、废墟、浅水等)对设备通行能力的影响",
+                        "根据\"发现伤员\"到\"必须撤离\"的时间窗口评估救助紧急度"
                     ],
-                    "knowledge_trace": "任务文本解析 → 伤员/地形/时间三类约束建模 → 为设备选择与数量推算提供输入。"
+                    "knowledge_trace": "任务文本解析 → 坐标/伤员/地形/时间约束建模 → 为设备选择与数量推算提供输入。"
                 },
                 "equipment_matching": {
                     "title": "设备类型匹配",
-                    "summary": "在医疗无人机、担架无人车与地面机器人中进行组合选择，以覆盖侦察、急救和搬运功能。",
+                    "summary": "在医疗无人机、担架无人车与地面机器人中进行组合选择，理由：这些设备具备生命体征监测与搬运能力，以覆盖侦察、急救和搬运功能。",
                     "key_points": [
-                        "为快速抵近和远程观察选配医疗无人机，承担先期侦察与急救包投放",
-                        "为稳定搬运与撤离选配担架无人车，满足承重与地形通过性需求",
+                        "医疗无人机：具备生命体征远程监测(心率、体温、呼吸频率)与急救包投放能力",
+                        "担架无人车：具备稳定搬运能力(载重150kg)与生命体征实时监测功能",
+                        "选择理由：医疗无人机快速抵近观察，担架无人车满足承重与地形通过性需求",
                         "在复杂地形或狭窄空间场景下考虑增配多足救援机器人"
                     ],
-                    "knowledge_trace": "任务要素 → 功能需求拆解（侦察/急救/搬运） → 匹配具备相应能力的无人平台。"
+                    "knowledge_trace": "任务要素 → 功能需求拆解(侦察/监测/急救/搬运) → 匹配具备生命体征监测与搬运能力的无人平台。"
                 },
                 "quantity_calculation": {
                     "title": "数量计算",
-                    "summary": "基于每类设备的载荷能力与行动效率，结合冗余策略推算所需设备数量。",
+                    "summary": "基于每类设备的载荷能力与行动效率，结合冗余策略推算所需救援设备数量。",
                     "key_points": [
-                        "按照“两名伤员+可能随身物资”估算搬运需求",
-                        "考虑单台担架车一次只能搬运一名伤员，推导至少需要两次往返或两台设备",
-                        "为防止设备故障或路径被阻断，增加1台冗余平台或预备替代路径"
+                        "医疗无人机：需要1架进行侦察、伤情监测与急救包投放",
+                        "担架无人车：单台载重150kg，一次搬运一名伤员，考虑伤员数量推导至少需要2台(含冗余)",
+                        "按照\"伤员+可能随身物资\"估算搬运需求，单车有效载荷按70%计算",
+                        "为防止设备故障或路径被阻断，增加冗余平台或预备替代路径"
                     ],
-                    "knowledge_trace": "伤员与物资载荷建模 → 按设备能力计算理论最小数量 → 加入冗余与调度弹性。"
+                    "knowledge_trace": "伤员与物资载荷建模 → 按设备能力计算理论最小数量 → 加入冗余策略 → 确定救援设备数量。"
                 },
                 "rescue_planning": {
                     "title": "救援方式规划",
-                    "summary": "生成“空投急救包 + 无人机抵近侦察 + 担架无人车转运”的组合救援流程。",
+                    "summary": "生成\"无人机抵近观察+空投急救包+担架无人车转运\"的组合救援流程。",
                     "key_points": [
-                        "先由医疗无人机抵近观察，确认周边环境与伤情，必要时空投急救包",
-                        "随后安排担架无人车沿安全路径接近伤员位置并完成转运",
+                        "第一步：医疗无人机抵近观察，利用生命体征监测确认伤情与周边环境",
+                        "第二步：必要时空投急救包，为伤员提供初步急救支持",
+                        "第三步：担架无人车沿安全路径接近伤员位置并完成转运",
                         "在高风险区域预留备选撤离路径或分步中转点"
                     ],
-                    "knowledge_trace": "任务与设备能力 → 先侦察后搬运的流程设计 → 形成时间与路径均可执行的救援方案。"
+                    "knowledge_trace": "任务与设备能力 → 先侦察后急救再搬运的流程设计 → 形成时间与路径均可执行的救援方案。"
                 },
                 "team_formation": {
-                    "title": "救助编组结果",
-                    "summary": "综合前序分析，确定由1~2架医疗无人机与2台担架无人车组成的协同救援编组。",
+                    "title": "救助编组",
+                    "summary": "综合前序分析，确定由1架医疗无人机与2台担架无人车组成的协同救援编组。",
                     "key_points": [
-                        "为每台设备分配具体角色，如“前出侦察机”“急救包投放机”“主搬运车”“备用搬运车”",
+                        "编组构成：1架医疗无人机(侦察+监测)+2台担架无人车(搬运+备用)",
+                        "为每台设备分配具体角色：前出侦察机、急救包投放机、主搬运车、备用搬运车",
                         "给出设备间的到达与撤离先后顺序，避免路线拥堵与冲突",
                         "形成可直接下发给调度模块的结构化编组描述"
                     ],
-                    "knowledge_trace": "任务解析 + 设备匹配 + 数量与方式推理 → 汇总为可执行的救援编组蓝图。",
+                    "knowledge_trace": "任务解析 + 设备匹配 + 数量与方式推理 → 汇总为可执行的救援编组方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "task",
-                                "label": "任务解析(两名伤员,X区域)", "type": "input"},
-                            {"id": "equip",
-                                "label": "设备匹配(无人机/担架车/机器人)", "type": "process"},
-                            {"id": "qty",
-                                "label": "数量计算(载荷+冗余)", "type": "process"},
-                            {"id": "plan", "label": "救援方式规划", "type": "process"},
-                            {"id": "team", "label": "编组方案输出", "type": "output"}
+                            # 主推理链节点（5个）
+                            {"id": "task_parsing", "label": "任务解析", "type": "input"},
+                            {"id": "equipment_matching", "label": "设备类型匹配", "type": "process"},
+                            {"id": "quantity_calc", "label": "数量计算", "type": "process"},
+                            {"id": "rescue_planning", "label": "救援方式规划", "type": "decision"},
+                            {"id": "team_output", "label": "编组方案输出", "type": "output"},
+                            
+                            # 辅助细节节点（4个）
+                            {"id": "injury_assessment", "label": "伤情评估", "type": "input"},
+                            {"id": "route_planning", "label": "路径规划", "type": "input"},
+                            {"id": "medical_resources", "label": "医疗资源配置", "type": "input"},
+                            {"id": "weather_status", "label": "气象状态", "type": "input"}
                         ],
                         "edges": [
-                            {"source": "task", "target": "equip"},
-                            {"source": "equip", "target": "qty"},
-                            {"source": "qty", "target": "plan"},
-                            {"source": "plan", "target": "team"}
+                            # 主推理链连接
+                            {"source": "task_parsing", "target": "equipment_matching"},
+                            {"source": "equipment_matching", "target": "quantity_calc"},
+                            {"source": "quantity_calc", "target": "rescue_planning"},
+                            {"source": "rescue_planning", "target": "team_output"},
+                            
+                            # 辅助节点的单向连接
+                            {"source": "injury_assessment", "target": "equipment_matching"},
+                            {"source": "route_planning", "target": "rescue_planning"},
+                            {"source": "medical_resources", "target": "quantity_calc"}
+                            
+                            # 注意：weather_status 独立存在，不连接到主链
                         ]
                     }
                 }

@@ -8,85 +8,111 @@ SCENARIOS: List[Scenario] = [
         id="personnel_transport_formation",  # 13. 任务编组
         model_name="人员输送",
         name="任务编组",
-        example_input="向X区域输送8名人员，需确保途中安全与舒适性",
-        reasoning_chain="任务解析（乘员数量、随行物资、路况风险）→ 车辆类型匹配（选择人员运输无人车或越野运输平台）→ 数量计算（依据单车载员数推导需要的车辆数量）→ 搭载方案规划（座位分配、随行物资固定）",
+        example_input="向指定区域输送人员，运输过程中需确保行程安全，给出对应的任务编组。",
+        reasoning_chain="任务解析（乘员数量、随行物资、路况风险）→ 车辆类型匹配（选择人员运输无人车或越野运输平台，理由：乘坐安全性与载员能力）→ 数量计算（依据单车载员数，推导出需要N辆车）→ 搭载方案规划（座位分配、随行物资固定）",
         prompt=(
             "【人员输送-任务编组专项要求】\n"
-            "1. 行为树必须包含：task_analysis（解析乘员数量、随行物资、路况风险）→ "
-            "vehicle_matching（选择人员运输无人车或越野运输平台）→ "
-            "quantity_calculation（依据单车载员数推导车辆数量）→ "
-            "boarding_plan（规划座位分配、随行物资固定）→ "
-            "formation_result（编组结果，包含 knowledge_graph）。\n"
-            "2. formation_result 的 knowledge_graph 应体现：任务解析 → 车辆匹配 → 数量计算 → 搭载方案 → 编组结果。"
+            "1. 行为树必须至少包含以下核心节点，严格按照推理链条自上而下展开：\n"
+            "   - personnel_transport_strategy（人员输送策略，根节点）：包含以下子节点：\n"
+            "       * task_analysis（任务解析）：解析乘员数量、随行物资、路况风险，包含以下子节点：\n"
+            "           - vehicle_matching（车辆类型匹配）：选择人员运输无人车或越野运输平台，理由：乘坐安全性与载员能力；\n"
+            "           - quantity_calculation（数量计算）：依据单车载员数，推导出需要N辆车；\n"
+            "       * boarding_plan（搭载方案规划）：规划座位分配、随行物资固定；\n"
+            "       * formation_result（人员输送编组，核心节点）：汇总编组方案，必须包含 knowledge_graph 字段。\n"
+            "2. formation_result 节点的 knowledge_graph 必须体现：任务解析 → 车辆类型匹配 → 数量计算 → 搭载方案规划 → 编组结果输出。\n"
+            "3. knowledge_graph 中必须包含至少8个节点，包括主推理链节点和辅助细节节点（如路况分析、安全评估、舒适度配置等）。\n"
+            "4. 在 node_insights 中，所有节点的 knowledge_trace 必须体现完整推理路径。"
         ),
         example_output={
             "default_focus": "formation_result",
             "behavior_tree": {
-                "id": "task_analysis",
-                "label": "🧍‍♀️🧍‍♂️ 任务解析：向X区域输送8名人员",
-                "status": "completed",
-                "summary": "解析乘员数量、随行物资与路况风险，为车辆选择和搭载方案提供约束。",
+                "id": "personnel_transport_strategy",
+                "label": "🧍‍♀️🧍‍♂️ 人员输送策略",
+                "status": "active",
+                "summary": "生成包含任务解析、车辆类型匹配、数量计算、搭载方案规划的完整人员输送编组方案，确保行程安全与舒适性。",
                 "children": [
                     {
-                        "id": "vehicle_matching",
-                        "label": "车辆类型匹配",
+                        "id": "task_analysis",
+                        "label": "📦 任务解析",
                         "status": "completed",
-                        "summary": "在人员运输无人车与越野运输平台中选择合适的组合。",
-                        "children": []
-                    },
-                    {
-                        "id": "quantity_calculation",
-                        "label": "车辆数量计算",
-                        "status": "completed",
-                        "summary": "根据单车载员能力与随行物资体积推算所需车辆数量并预留冗余。",
-                        "children": []
+                        "summary": "解析向指定区域输送人员的任务，识别乘员数量、随行物资、路况风险等关键要素。",
+                        "children": [
+                            {
+                                "id": "vehicle_matching",
+                                "label": "🚗 车辆类型匹配：人员运输无人车",
+                                "status": "completed",
+                                "summary": "选择人员运输无人车或越野运输平台，理由：乘坐安全性与载员能力满足输送需求。",
+                                "children": []
+                            },
+                            {
+                                "id": "quantity_calculation",
+                                "label": "🔢 车辆数量计算：2辆运输车",
+                                "status": "completed",
+                                "summary": "根据单车载员能力(最多6人)与随行物资体积，推导出需要2辆车并预留冗余。",
+                                "children": []
+                            }
+                        ]
                     },
                     {
                         "id": "boarding_plan",
-                        "label": "搭载方案规划",
+                        "label": "📋 搭载方案规划",
                         "status": "completed",
                         "summary": "规划座位分配与随行物资固定位置，兼顾安全与舒适性。",
                         "children": []
                     },
                     {
                         "id": "formation_result",
-                        "label": "✅ 输送编组结果",
+                        "label": "✅ 人员输送编组",
                         "status": "active",
-                        "summary": "确定若干辆人员运输车的编组与各车的乘员/物资分配方案。",
+                        "summary": "确定2辆人员运输车的编组与各车的乘员/物资分配方案。",
                         "children": []
                     }
                 ]
             },
             "node_insights": {
+                "personnel_transport_strategy": {
+                    "title": "人员输送策略",
+                    "summary": "整合任务解析、车辆类型匹配、数量计算与搭载方案规划，生成完整的人员输送编组方案。",
+                    "key_points": [
+                        "任务解析：识别乘员数量、随行物资、路况风险等关键要素",
+                        "车辆匹配：选择具备乘坐安全性与载员能力的人员运输无人车或越野平台",
+                        "数量计算：依据单车载员数推导出需要的车辆数量",
+                        "搭载方案：规划座位分配、随行物资固定，确保行程安全"
+                    ],
+                    "knowledge_trace": "任务要素 → 车辆与数量推断 → 搭载方案规划 → 形成可执行的输送编组方案。"
+                },
                 "task_analysis": {
                     "title": "任务解析",
-                    "summary": "围绕“向X区域输送8名人员，确保途中安全与舒适性”的目标，提取关键信息。",
+                    "summary": "围绕\"向指定区域输送人员，确保行程安全\"的目标，提取关键信息。",
                     "key_points": [
-                        "统计实际乘员数量与角色分布（指挥、保障等）",
+                        "识别乘员数量与角色分布（指挥、保障等），假设需要输送8名人员",
                         "确定随行物资种类与体积，如装备、医疗包、补给品",
-                        "分析路况（山路、非铺装路面、涉水路段）对车辆与舒适性的影响"
+                        "分析路况（山路、非铺装路面、涉水路段）对车辆与舒适性的影响",
+                        "评估行程安全要求，包括路径风险与应急预案"
                     ],
-                    "knowledge_trace": "任务文本 → 乘员/物资/路况三类要素抽取 → 形成车辆与编组设计的输入条件。"
+                    "knowledge_trace": "任务文本 → 乘员/物资/路况/安全要素抽取 → 形成车辆与编组设计的输入条件。"
                 },
                 "vehicle_matching": {
                     "title": "车辆类型匹配",
-                    "summary": "根据任务约束选择人员运输无人车或越野平台，必要时组合使用。",
+                    "summary": "根据任务约束选择人员运输无人车或越野平台，理由：乘坐安全性与载员能力满足输送需求。",
                     "key_points": [
-                        "若路况平顺且对舒适性要求高，优先选择专用人员运输无人车",
-                        "在复杂地形或越野环境下，引入越野运输平台保证通过性",
+                        "人员运输无人车：载员能力6人，配备安全座椅与安全带，乘坐安全性高",
+                        "越野运输平台：在复杂地形或越野环境下，引入越野平台保证通过性与载员能力",
+                        "选择理由：专用人员运输无人车具备良好的乘坐安全性与足够的载员能力",
                         "考虑车体悬挂与减振能力以保障乘坐舒适度"
                     ],
-                    "knowledge_trace": "路况与舒适性需求 → 车辆能力对比 → 选定一类或多类车辆组合。"
+                    "knowledge_trace": "路况与安全需求 → 车辆乘坐安全性与载员能力评估 → 选定人员运输无人车或越野平台组合。"
                 },
                 "quantity_calculation": {
                     "title": "车辆数量计算",
-                    "summary": "结合乘员数量、单车载员上限与物资占用空间计算车辆数，并考虑备份。",
+                    "summary": "依据单车载员数，推导出需要N辆车，结合物资占用空间并考虑备份。",
                     "key_points": [
-                        "按单车额定载员数初步计算理论车辆数量",
+                        "单车载员能力：人员运输无人车最多可载6人",
+                        "计算逻辑：8名乘员 ÷ 6人/车 = 1.33车，向上取整需要2辆车",
                         "为避免超载与保证舒适度，预留适当空座与物资空间",
-                        "根据任务重要性增加1辆冗余车辆或规划二次往返方案"
+                        "根据任务重要性考虑增加1辆冗余车辆或规划二次往返方案"
                     ],
-                    "knowledge_trace": "乘员与物资需求建模 → 按车辆上限约束求解最小车数 → 加入冗余安全系数。"
+                    "knowledge_trace": "乘员数量 → 单车载员数评估 → 推导车辆数量 → 加入冗余策略 → 确定最终车辆数。"
                 },
                 "boarding_plan": {
                     "title": "搭载方案规划",
@@ -99,29 +125,43 @@ SCENARIOS: List[Scenario] = [
                     "knowledge_trace": "车辆编组结果 → 座位与货位资源映射 → 形成安全舒适的搭载方案。"
                 },
                 "formation_result": {
-                    "title": "输送编组结果",
+                    "title": "人员输送编组",
                     "summary": "输出包括车辆类型、数量、每车乘员与物资分配的完整编组方案。",
                     "key_points": [
+                        "编组构成：2辆人员运输无人车，每车最多载6人",
                         "列出每辆车的车型、编号、负责运送的乘员名单与主要物资",
                         "说明编组设计中与安全和舒适度相关的关键考虑因素",
                         "生成可供后续路径规划与监控模块直接使用的结构化描述"
                     ],
-                    "knowledge_trace": "任务解析 + 车辆匹配 + 数量计算 + 搭载规划 → 汇总为人员输送编组蓝图。",
+                    "knowledge_trace": "任务解析 + 车辆匹配 + 数量计算 + 搭载规划 → 汇总为人员输送编组方案。",
                     "knowledge_graph": {
                         "nodes": [
-                            {"id": "task",
-                                "label": "任务解析(8名乘员,X区域)", "type": "input"},
-                            {"id": "veh", "label": "车辆类型匹配", "type": "process"},
-                            {"id": "qty", "label": "车辆数量计算", "type": "process"},
-                            {"id": "board", "label": "搭载方案规划", "type": "process"},
-                            {"id": "form", "label": "输送编组结果", "type": "output"}
+                            # 主推理链节点（5个）
+                            {"id": "task_parsing", "label": "任务解析", "type": "input"},
+                            {"id": "vehicle_matching", "label": "车辆类型匹配", "type": "process"},
+                            {"id": "quantity_calc", "label": "数量计算", "type": "process"},
+                            {"id": "boarding_plan", "label": "搭载方案规划", "type": "decision"},
+                            {"id": "formation_output", "label": "编组方案输出", "type": "output"},
+                            
+                            # 辅助细节节点（4个）
+                            {"id": "road_analysis", "label": "路况分析", "type": "input"},
+                            {"id": "safety_assessment", "label": "安全评估", "type": "input"},
+                            {"id": "comfort_config", "label": "舒适度配置", "type": "input"},
+                            {"id": "emergency_plan", "label": "应急预案", "type": "input"}
                         ],
                         "edges": [
-                            {"source": "task", "target": "veh"},
-                            {"source": "task", "target": "qty"},
-                            {"source": "veh", "target": "qty"},
-                            {"source": "qty", "target": "board"},
-                            {"source": "board", "target": "form"}
+                            # 主推理链连接
+                            {"source": "task_parsing", "target": "vehicle_matching"},
+                            {"source": "vehicle_matching", "target": "quantity_calc"},
+                            {"source": "quantity_calc", "target": "boarding_plan"},
+                            {"source": "boarding_plan", "target": "formation_output"},
+                            
+                            # 辅助节点的单向连接
+                            {"source": "road_analysis", "target": "vehicle_matching"},
+                            {"source": "safety_assessment", "target": "boarding_plan"},
+                            {"source": "comfort_config", "target": "boarding_plan"}
+                            
+                            # 注意：emergency_plan 独立存在，不连接到主链
                         ]
                     }
                 }
