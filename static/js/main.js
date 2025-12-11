@@ -240,6 +240,33 @@ function renderBehaviorTree(treeData) {
                     'drag-canvas',
                     'zoom-canvas',
                     'drag-node',
+                    {
+                        type: 'tooltip',
+                        formatText: function formatText(model) {
+                            // 如果节点有summary属性，显示它
+                            if (model.summary) {
+                                const title = model.label || model.id;
+                                return `<div style="max-width: 350px;">
+                                    <div style="font-weight: 600; color: #1976D2; margin-bottom: 8px; font-size: 13px; border-bottom: 1px solid #E3F2FD; padding-bottom: 6px;">
+                                        ${title}
+                                    </div>
+                                    <div style="color: #37474F; line-height: 1.6; font-size: 12px; word-wrap: break-word;">
+                                        ${model.summary}
+                                    </div>
+                                </div>`;
+                            }
+                            return null; // 没有summary时不显示tooltip
+                        },
+                        offset: 15,
+                        shouldBegin: function shouldBegin(e) {
+                            // 只有当节点有summary时才显示tooltip
+                            return !!(e.item && e.item.getModel && e.item.getModel().summary);
+                        },
+                        // 确保tooltip附加到正确的容器
+                        getContainer: function() {
+                            return container;
+                        },
+                    },
                 ],
             },
             defaultNode: {
@@ -697,7 +724,48 @@ function renderInsightGraph(graphData) {
             linkCenter: true,
             // 默认模式，可以拖动、缩放、拖动节点
             modes: {
-                default: ['drag-canvas', 'zoom-canvas', 'drag-node'],
+                default: [
+                    'drag-canvas',
+                    'zoom-canvas',
+                    'drag-node',
+                    {
+                        type: 'tooltip',
+                        formatText: function formatText(model) {
+                            // 如果节点有summary属性，显示它
+                            if (model.summary) {
+                                const title = model.label || model.id;
+                                const nodeType = model.type || 'process';
+                                const typeColors = {
+                                    'input': '#4CAF50',
+                                    'process': '#1976D2',
+                                    'decision': '#FF9800',
+                                    'output': '#9C27B0'
+                                };
+                                const typeColor = typeColors[nodeType] || '#1976D2';
+                                
+                                return `<div style="max-width: 320px;">
+                                    <div style="font-weight: 600; color: ${typeColor}; margin-bottom: 8px; font-size: 13px; border-bottom: 1px solid #E0E0E0; padding-bottom: 6px; display: flex; align-items: center;">
+                                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${typeColor}; margin-right: 6px;"></span>
+                                        ${title}
+                                    </div>
+                                    <div style="color: #37474F; line-height: 1.6; font-size: 12px; word-wrap: break-word;">
+                                        ${model.summary}
+                                    </div>
+                                </div>`;
+                            }
+                            return null; // 没有summary时不显示tooltip
+                        },
+                        offset: 15,
+                        shouldBegin: function shouldBegin(e) {
+                            // 只有当节点有summary时才显示tooltip
+                            return !!(e.item && e.item.getModel && e.item.getModel().summary);
+                        },
+                        // 确保tooltip附加到正确的容器
+                        getContainer: function() {
+                            return container;
+                        },
+                    },
+                ],
             },
             defaultNode: {
                 size: 80,
@@ -789,6 +857,7 @@ function convertInsightToG6Format(graphData) {
             id: node.id,
             label: node.label,
             type: node.type || 'process',
+            summary: node.summary || node.label, // 使用summary，如果没有则使用label作为fallback
         })),
         edges: edges.map(edge => ({
             source: edge.source,
