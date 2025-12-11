@@ -1,0 +1,26 @@
+{
+  "name": "supportmodel",
+  "version": "1.0.0",
+  "description": "一个基于 Flask 和 G6 的支援模型推理可视化平台，支持动态任务解析、知识图谱展示，并可选接入大模型按测试大纲生成行为树蓝图。",
+  "main": "batch_screenshot.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kjhxjm/supportmodel.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kjhxjm/supportmodel/issues"
+  },
+  "homepage": "https://github.com/kjhxjm/supportmodel#readme",
+  "dependencies": {
+    "playwright": "^1.57.0"
+  }
+}
